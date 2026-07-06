@@ -55,7 +55,7 @@ jobs:
           pip install pyinstaller .
 
       - name: Build standalone executable
-        run: pyinstaller --onefile --name alscan --hidden-import alscan.checks.samples --hidden-import alscan.checks.plugins --hidden-import alscan.checks.performance --hidden-import alscan.checks.project_hygiene --hidden-import alscan.checks.duplicates --hidden-import alscan.checks.misc --hidden-import alscan.report.terminal --hidden-import alscan.report.html --hidden-import alscan.report.json src/alscan/cli.py
+        run: pyinstaller --onefile --name alscan --collect-submodules alscan.checks --collect-submodules alscan.report src/alscan/cli.py
 
       - name: Upload binary to release
         uses: softprops/action-gh-release@v3
