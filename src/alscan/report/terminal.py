@@ -106,3 +106,51 @@ def print_terminal_report(result: ScanResult, verbose: bool = False) -> str:
     console.print()
 
     return buf.getvalue()
+
+
+def print_batch_summary(results: list[ScanResult]) -> str:
+    buf = io.StringIO()
+    console = Console(file=buf, force_terminal=False, width=120)
+
+    total_errors = sum(len(r.errors) for r in results)
+    total_warnings = sum(len(r.warnings) for r in results)
+    total_info = sum(len(r.info) for r in results)
+
+    console.print()
+    console.print(Panel(
+        f"[bold]Batch Summary[/bold] — {len(results)} projects  "
+        f"[bold red]{total_errors} errors[/]  "
+        f"[bold yellow]{total_warnings} warnings[/]  "
+        f"[cyan]{total_info} info[/]",
+        border_style="green",
+    ))
+    console.print()
+
+    table = Table(box=box.SIMPLE, header_style="bold")
+    table.add_column("Project", width=40)
+    table.add_column("Errors", width=8, justify="right")
+    table.add_column("Warnings", width=10, justify="right")
+    table.add_column("Info", width=8, justify="right")
+
+    for r in sorted(results, key=lambda x: x.project.file_path.name if x.project.file_path else ""):
+        name = r.project.file_path.name if r.project.file_path else "unknown"
+        e = len(r.errors)
+        w = len(r.warnings)
+        i = len(r.info)
+        table.add_row(
+            Text(name),
+            Text(str(e), style="bold red" if e else "dim"),
+            Text(str(w), style="bold yellow" if w else "dim"),
+            Text(str(i), style="cyan" if i else "dim"),
+        )
+
+    table.add_row(
+        Text("[bold]Total[/bold]"),
+        Text(str(total_errors), style="bold red"),
+        Text(str(total_warnings), style="bold yellow"),
+        Text(str(total_info), style="cyan"),
+    )
+
+    console.print(table)
+    console.print()
+    return buf.getvalue()

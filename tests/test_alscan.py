@@ -19,11 +19,11 @@ def test_parse_clean():
 
 
 def test_parse_all_checks():
-    """all_checks.als parses all 13 tracks correctly."""
+    """all_checks.als parses all 15 tracks correctly."""
     proj = parse_als(FIXTURES / "all_checks.als")
-    assert len(proj.tracks) == 13
+    assert len(proj.tracks) == 15
     types = {t.track_type for t in proj.tracks}
-    assert types == {"audio", "midi", "group", "return"}
+    assert types == {"audio", "midi", "group", "return", "master"}
 
 
 def test_parse_frozen_returns():
@@ -53,8 +53,8 @@ def test_frozen_returns_project_has_no_findings():
     assert len(unused) == 0
 
 
-def test_all_15_checks_triggered():
-    """all_checks.als triggers all 15 check types at least once."""
+def test_all_checks_triggered():
+    """all_checks.als triggers all 19 check types at least once."""
     proj = parse_als(FIXTURES / "all_checks.als")
     findings = []
     for check in list_checks():
@@ -69,6 +69,8 @@ def test_all_15_checks_triggered():
         "empty_tracks", "unused_returns", "empty_groups",
         "unnamed_tracks", "duplicate_track_names",
         "duplicate_samples",
+        "warped_clips", "master_chain_plugins",
+        "extreme_tempo", "no_locators",
     }
     missing = expected - triggered
     extra = triggered - expected
@@ -202,6 +204,41 @@ def test_missing_pack_samples_check():
     assert "Pack" in findings[0].message
 
 
+# -- New v0.2 check tests --
+
+def test_warped_clips_check():
+    proj = parse_als(FIXTURES / "all_checks.als")
+    check = get_check("warped_clips")
+    findings = check.func(proj)
+    assert len(findings) > 0
+    assert all(f.severity == "info" for f in findings)
+
+
+def test_master_chain_plugins_check():
+    proj = parse_als(FIXTURES / "all_checks.als")
+    check = get_check("master_chain_plugins")
+    findings = check.func(proj)
+    assert len(findings) > 0
+    assert findings[0].severity == "info"
+
+
+def test_extreme_tempo_check():
+    proj = parse_als(FIXTURES / "all_checks.als")
+    check = get_check("extreme_tempo")
+    findings = check.func(proj)
+    assert len(findings) > 0
+    assert findings[0].severity == "info"
+
+
+def test_no_locators_check():
+    """project with >5 tracks and no locators triggers this check."""
+    proj = parse_als(FIXTURES / "all_checks.als")
+    check = get_check("no_locators")
+    findings = check.func(proj)
+    assert len(findings) > 0
+    assert findings[0].severity == "info"
+
+
 def test_list_checks_returns_all():
     checks = list_checks()
     names = {c.name for c in checks}
@@ -215,7 +252,11 @@ def test_list_checks_returns_all():
         "unnamed_tracks", "duplicate_track_names",
         "duplicate_samples",
     }
-    assert names == expected
+    expected_all = expected | {
+        "warped_clips", "master_chain_plugins",
+        "extreme_tempo", "no_locators",
+    }
+    assert names == expected_all
 
 
 # -- Model tests --
