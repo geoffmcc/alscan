@@ -7,7 +7,7 @@ name = "alscan"
 version = "0.3.0"
 description = "Ableton Live Project Health Scanner — analyze, version, and merge .als files"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.12"
 authors = [{ name = "Geoffrey McClinsey" }]
 keywords = ["ableton", "live", "als", "music", "production", "scanner", "analysis"]
