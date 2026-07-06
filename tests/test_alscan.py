@@ -337,3 +337,204 @@ def test_parse_xml_string():
 def test_parse_als_file_not_found():
     with pytest.raises(FileNotFoundError):
         parse_als("Z:/does/not/exist.als")
+
+
+# -- Versioning tests (v0.3) --
+
+def test_build_snapshot():
+    from alscan.versioner import build_snapshot
+    proj = parse_als(FIXTURES / "clean.als")
+    snap = build_snapshot(proj)
+    assert snap.project_name == "clean"
+    assert snap.tempo == 120.0
+    assert snap.track_count == 2
+    assert snap.device_count == 0
+
+
+def test_snapshot_round_trip():
+    from alscan.versioner import build_snapshot, Snapshot
+    proj = parse_als(FIXTURES / "clean.als")
+    snap = build_snapshot(proj)
+    js = snap.to_json()
+    restored = Snapshot.from_json(js)
+    assert restored.project_name == "clean"
+    assert restored.tempo == 120.0
+    assert restored.track_count == 2
+
+
+def test_snapshot_has_consistent_fingerprint():
+    from alscan.versioner import build_snapshot
+    proj = parse_als(FIXTURES / "clean.als")
+    snap = build_snapshot(proj)
+    assert len(snap.structural_fingerprint) == 16
+    assert all(c in "0123456789abcdef" for c in snap.structural_fingerprint)
+
+
+def test_save_and_find_snapshots(tmp_path):
+    from alscan.versioner import build_snapshot, save_snapshot, find_snapshots, load_snapshot
+    proj = parse_als(FIXTURES / "clean.als")
+    p1 = save_snapshot(proj, tmp_path)
+    assert p1.exists()
+    assert p1.suffix == ".json"
+    assert p1.parent.name == "snapshots"
+    snaps = find_snapshots(tmp_path)
+    assert len(snaps) == 1
+    loaded = load_snapshot(snaps[0])
+    assert loaded.tempo == 120.0
+
+
+def test_diff_same_project_no_changes():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    proj_a = parse_als(FIXTURES / "clean.als")
+    proj_b = parse_als(FIXTURES / "clean.als")
+    snap_a = build_snapshot(proj_a)
+    snap_b = build_snapshot(proj_b)
+    result = diff_snapshots(snap_a, snap_b)
+    assert not result.has_changes
+
+
+def test_diff_different_projects():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    clean = build_snapshot(parse_als(FIXTURES / "clean.als"))
+    all_chk = build_snapshot(parse_als(FIXTURES / "all_checks.als"))
+    result = diff_snapshots(clean, all_chk)
+    assert result.has_changes
+    assert result.tempo_changed
+    assert result.tempo_before == 120.0
+    assert result.tempo_after == 250.0
+    assert len(result.track_changes) > 0
+
+
+# -- Versioning schema / validation tests --
+
+def test_snapshot_from_json_validates_format_version():
+    from alscan.versioner import Snapshot, SNAPSHOT_FORMAT_VERSION
+    data = '{"format_version":"0","project_name":"x","timestamp":1.0,"structural_fingerprint":"abc","creator":"","major_version":"","minor_version":"","tempo":120.0,"time_signature":[4,4],"tracks":[],"locators":[]}'
+    with pytest.raises(ValueError, match="Unsupported snapshot format version"):
+        Snapshot.from_json(data)
+
+
+def test_snapshot_from_json_rejects_missing_fields():
+    from alscan.versioner import Snapshot
+    with pytest.raises(ValueError, match="Snapshot missing required fields"):
+        Snapshot.from_json('{"format_version":"1"}')
+
+
+def test_snapshot_from_json_rejects_extra_fields():
+    from alscan.versioner import Snapshot
+    data = '{"format_version":"1","project_name":"x","timestamp":1.0,"structural_fingerprint":"abc","creator":"","major_version":"","minor_version":"","tempo":120.0,"time_signature":[4,4],"tracks":[],"locators":[],"extra":"bad"}'
+    with pytest.raises(ValueError, match="has unknown fields"):
+        Snapshot.from_json(data)
+
+
+def test_snapshot_from_json_rejects_type_mismatch():
+    from alscan.versioner import Snapshot
+    data = '{"format_version":"1","project_name":"x","timestamp":"not_a_number","structural_fingerprint":"abc","creator":"","major_version":"","minor_version":"","tempo":120.0,"time_signature":[4,4],"tracks":[],"locators":[]}'
+    with pytest.raises(TypeError, match="expected.*got str"):
+        Snapshot.from_json(data)
+
+
+def test_snapshot_filename_includes_uuid(tmp_path):
+    from alscan.versioner import build_snapshot, save_snapshot
+    proj = parse_als(FIXTURES / "clean.als")
+    p1 = save_snapshot(proj, tmp_path)
+    parts = p1.stem.split("-")
+    assert len(parts) >= 3
+    assert len(parts[-1]) == 12
+
+
+def test_save_snapshot_is_not_overwritten(tmp_path):
+    from alscan.versioner import build_snapshot, save_snapshot
+    proj = parse_als(FIXTURES / "clean.als")
+    p1 = save_snapshot(proj, tmp_path)
+    p2 = save_snapshot(proj, tmp_path)
+    assert p1.name != p2.name
+
+
+def test_find_snapshots_ignores_corrupt_files(tmp_path):
+    from alscan.versioner import save_snapshot, find_snapshots
+    proj = parse_als(FIXTURES / "clean.als")
+    save_snapshot(proj, tmp_path)
+    bad = tmp_path / ".alscan" / "snapshots" / "corrupt.json"
+    bad.parent.mkdir(parents=True, exist_ok=True)
+    bad.write_text("not valid json")
+    snaps = find_snapshots(tmp_path)
+    # Should still find the valid one, ignore corrupt
+    assert len(snaps) == 1
+
+
+def test_find_snapshots_chronological_order(tmp_path):
+    from alscan.versioner import build_snapshot, save_snapshot, find_snapshots
+    proj = parse_als(FIXTURES / "clean.als")
+    p1 = save_snapshot(proj, tmp_path)
+    import time as ttime
+    ttime.sleep(0.01)
+    p2 = save_snapshot(proj, tmp_path)
+    snaps = find_snapshots(tmp_path)
+    # Most recent first
+    assert snaps[0].name == p2.name
+    assert snaps[1].name == p1.name
+
+
+def test_diff_track_added():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    clean = build_snapshot(parse_als(FIXTURES / "clean.als"))
+    all_chk = build_snapshot(parse_als(FIXTURES / "all_checks.als"))
+    result = diff_snapshots(clean, all_chk)
+    added = [t for t in result.track_changes if t.kind == "added"]
+    assert len(added) > 0
+    assert any(t.name == "Warped Track" for t in added)
+
+
+# -- Report output / atomic write tests --
+
+def test_atomic_write_report_concurrent_writers(tmp_path):
+    """Verify atomic no-clobber: exactly one of N concurrent writers succeeds."""
+    from concurrent.futures import ThreadPoolExecutor
+    from alscan.cli import _atomic_write_report
+
+    dest = tmp_path / "report.html"
+    num_writers = 10
+
+    def writer(worker_id: int) -> bool:
+        content = f"Report from worker {worker_id}"
+        try:
+            _atomic_write_report(dest, content)
+            return True
+        except FileExistsError:
+            return False
+
+    with ThreadPoolExecutor(max_workers=num_writers) as pool:
+        results = list(pool.map(writer, range(num_writers)))
+
+    success_count = sum(results)
+    assert success_count == 1, f"Expected 1 writer to succeed, got {success_count}"
+
+    assert dest.exists(), "Destination file was not created"
+    content = dest.read_text()
+    assert content.startswith("Report from worker "), f"Unexpected content: {content}"
+    worker_id = content.replace("Report from worker ", "").strip()
+    assert worker_id.isdigit()
+
+    stale = list(tmp_path.glob(".*.tmp.*"))
+    assert len(stale) == 0, f"Stale temporary files remain: {stale}"
+
+
+def test_atomic_write_report_existing_fails(tmp_path):
+    """Writing to an existing destination raises FileExistsError."""
+    from alscan.cli import _atomic_write_report
+    dest = tmp_path / "report.html"
+    dest.write_text("original content")
+    with pytest.raises(FileExistsError):
+        _atomic_write_report(dest, "new content")
+    assert dest.read_text() == "original content"
+
+
+def test_atomic_write_report_creates_parent_dirs(tmp_path):
+    """Parent directories are created automatically."""
+    from alscan.cli import _atomic_write_report
+    dest = tmp_path / "sub" / "nested" / "report.html"
+    _atomic_write_report(dest, "hello")
+    assert dest.read_text() == "hello"
+    stale = list(tmp_path.glob("**/.*.tmp.*"))
+    assert len(stale) == 0
