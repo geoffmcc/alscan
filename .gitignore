@@ -44,5 +44,8 @@ Thumbs.db
 # Generated reports
 *alscan-report*.html
 
+# Snapshots
+.alscan/
+
 # Temp test files
 tests/tmp/

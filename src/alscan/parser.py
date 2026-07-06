@@ -6,6 +6,12 @@ from pathlib import Path, PurePath
 
 from lxml import etree
 
+_SAFE_PARSER = etree.XMLParser(
+    resolve_entities=False,
+    no_network=True,
+    recover=False,
+)
+
 from alscan.models import Clip, Device, PluginRef, Project, SampleRef, Track
 
 TRACK_TAGS = {
@@ -34,12 +40,12 @@ def parse_als(path: str | Path) -> Project:
             xml_bytes = gz.read()
     else:
         xml_bytes = raw
-    root = etree.fromstring(xml_bytes)
+    root = etree.fromstring(xml_bytes, parser=_SAFE_PARSER)
     return _parse_root(root, path)
 
 
 def parse_xml_string(xml: str, path: str = ".") -> Project:
-    root = etree.fromstring(xml.encode("utf-8"))
+    root = etree.fromstring(xml.encode("utf-8"), parser=_SAFE_PARSER)
     return _parse_root(root, Path(path))
 
 
@@ -107,7 +113,7 @@ def _parse_locators(live_set, proj):
     if loc_inner is None:
         return
     for loc in loc_inner.findall("Locator"):
-        name = _gv(loc, "Name", "Value", "")
+        name = _gv(loc, "Name/EffectiveName", "Value", "")
         time_str = _gv(loc, "Time", "Value", "0")
         try:
             time_val = float(time_str)

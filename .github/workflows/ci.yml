@@ -38,7 +38,11 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     strategy:
       matrix:
-        os: [macos-latest, windows-latest]
+        include:
+          - os: macos-latest
+            exe_name: alscan-macos
+          - os: windows-latest
+            exe_name: alscan-windows.exe
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -55,9 +59,9 @@ jobs:
           pip install pyinstaller .
 
       - name: Build standalone executable
-        run: pyinstaller --onefile --name alscan --collect-submodules alscan.checks --collect-submodules alscan.report src/alscan/cli.py
+        run: pyinstaller --onefile --name ${{ matrix.exe_name }} --collect-submodules alscan.checks --collect-submodules alscan.report src/alscan/cli.py
 
       - name: Upload binary to release
         uses: softprops/action-gh-release@v3
         with:
-          files: dist/alscan*
+          files: dist/${{ matrix.exe_name }}*

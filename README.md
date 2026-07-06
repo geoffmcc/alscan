@@ -9,6 +9,7 @@ alscan scan "My Song/"
 
 ## Features
 
+- **Structural change tracking** — snapshot project structure, diff across versions, view change history
 - **19 health checks** — missing samples, broken plugins, frozen tracks, CPU-heavy plugins, duplicate samples, empty groups, warped clips, master chain plugins, and more
 - **Rich terminal output** — color-coded findings grouped by severity (error/warning/info)
 - **HTML report** — dark-themed static report with summary cards and track listing
@@ -33,14 +34,27 @@ alscan scan "~/Ableton Projects/My Song Project/" --format html --browser
 # Scan all projects under a folder
 alscan scan "~/Ableton Projects/" --recursive
 
+> **Note**: `--output` is not supported with `--recursive`. Each project's report is printed to stdout only.
+
 # List all available checks
 alscan list-checks
+
+# Capture a project snapshot
+alscan snapshot "~/Ableton Projects/My Song Project/"
+
+# Compare two .als project files
+alscan diff "My Song.als" "My Song Backups/v2.als"
+
+# View snapshot history
+alscan log "My Song Project/"
 ```
+
+> **Troubleshooting**: If `alscan scan <directory>` says "Multiple .als files found", the directory contains more than one project. Pass the explicit path to the `.als` file instead: `alscan scan "~/Ableton Projects/My Song/My Song.als"`.
 
 ## Output Example
 
 ```
-alscan v0.2.0 — Scan Report
+alscan v0.3.0 — Scan Report
 ═══════════════════════════════════════
 Project: My Song Project
 Creator: Ableton Live 12.4.2 · 120.0 BPM
@@ -97,7 +111,7 @@ Use `--format html --browser` to generate a dark-themed static HTML report in th
 
 ```
 alscan scan "My Song/" --format html --browser
-# → Writes alsan-report.html and opens it in your browser
+# → Writes alscan-report.html and opens it in your browser
 ```
 
 The report shows summary cards (errors/warnings/info counts), all findings with severity badges, a project stats grid, and a full track listing table.
@@ -119,6 +133,60 @@ echo $?  # 0 if no errors, 1 if errors found
 
 The JSON includes project metadata, track counts, and all findings with severity, check name, message, location, and suggestion.
 
+## Versioning
+
+Track your project's evolution with snapshot, diff, and log commands.
+
+> **Note**: The `snapshot` command creates an `.alscan/snapshots/` directory in the project folder. This directory is excluded from Git via `.gitignore`.
+
+```bash
+# Save a structural snapshot of the project
+alscan snapshot "My Song/"
+# → Writes .alscan/snapshots/My Song-<timestamp>-<uuid>.json
+
+# Compare two .als project files
+alscan diff "My Song.als" "My Song Backups/v2.als"
+
+# Compare a project against a previous snapshot
+alscan diff "My Song.als" "My Song/.alscan/snapshots/My Song-20260706-abc123.json"
+
+# Compare two snapshots
+alscan diff "My Song/.alscan/snapshots/v1.json" "My Song/.alscan/snapshots/v2.json"
+
+# → Shows: tempo, time signature, locator, track, device, and clip count changes
+#   (structural metadata only — not a complete Ableton project comparison)
+
+# View snapshot history
+alscan log "My Song/"
+# → Lists all snapshots with timestamps, BPM, track/device counts
+```
+
+Snapshots capture **structural metadata only**: project tempo/time sig/creator, track list with device/clip counts, plugin references, and a structural fingerprint (not audio content). The `Backup/` folder is excluded from recursive scanning.
+
+## Privacy & Security
+
+Reports and snapshots contain metadata that may include sensitive information:
+
+- **Plugin file paths** can reveal your username (e.g., `C:\Users\…`)
+- **Track names** may reflect unreleased song titles, client names, or working titles
+- **Creator field** shows the Ableton Live registration name
+
+Review reports before sharing them.  Snapshots are stored locally in `.alscan/` and are excluded from Git via `.gitignore`.
+
+## Platform Compatibility
+
+| OS         | Status                                       |
+|------------|----------------------------------------------|
+| Windows    | Tested via WSL; native PyInstaller builds    |
+| macOS      | PyInstaller builds; manual testing needed    |
+| Linux      | Supported for CI; Ableton does not run here  |
+
+**Known limitations**:
+- Atomic file operations (`os.link`) require both paths on the same filesystem volume
+- Network filesystems (NFS, SMB) may not guarantee atomic no-clobber writes
+- Long paths (>260 chars) on Windows are not handled — use Python 3.12+ or short paths
+- `Path.is_junction()` (Windows) requires Python 3.12
+
 ## Development
 
 ```bash
@@ -138,7 +206,7 @@ python -m tests.fixtures.generate
 
 - **v0.1** ✅ Project health scanning
 - **v0.2** ✅ Extended checks, JSON output, exit codes
-- **v0.3** — Project versioning (snapshot / diff / restore)
+- **v0.3** ✅ Project versioning (snapshot / diff / log) — [pending release](https://github.com/geoffmcc/alscan/pull/2)
 - **v0.4** — Project merging (three-way merge)
 
 ## License

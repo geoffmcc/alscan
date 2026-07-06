@@ -94,5 +94,6 @@ hr{border:none;border-top:1px solid #333}
   <tr><td>Locators</td><td>{{ project.locators|length }}</td></tr>
 </table>
 <p style="color:#666;font-size:0.85em">Scan completed in {{ result.scan_time_ms }}ms - alscan v{{ version }}</p>
+<p style="color:#555;font-size:0.75em">Report contains project metadata (track names, plugin paths). Review before sharing.</p>
 </body>
 </html>"""

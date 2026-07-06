@@ -337,3 +337,481 @@ def test_parse_xml_string():
 def test_parse_als_file_not_found():
     with pytest.raises(FileNotFoundError):
         parse_als("Z:/does/not/exist.als")
+
+
+# -- Versioning tests (v0.3) --
+
+def test_build_snapshot():
+    from alscan.versioner import build_snapshot
+    proj = parse_als(FIXTURES / "clean.als")
+    snap = build_snapshot(proj)
+    assert snap.project_name == "clean"
+    assert snap.tempo == 120.0
+    assert snap.track_count == 2
+    assert snap.device_count == 0
+
+
+def test_snapshot_round_trip():
+    from alscan.versioner import build_snapshot, Snapshot
+    proj = parse_als(FIXTURES / "clean.als")
+    snap = build_snapshot(proj)
+    js = snap.to_json()
+    restored = Snapshot.from_json(js)
+    assert restored.project_name == "clean"
+    assert restored.tempo == 120.0
+    assert restored.track_count == 2
+
+
+def test_snapshot_has_consistent_fingerprint():
+    from alscan.versioner import build_snapshot
+    proj = parse_als(FIXTURES / "clean.als")
+    snap = build_snapshot(proj)
+    assert len(snap.structural_fingerprint) == 16
+    assert all(c in "0123456789abcdef" for c in snap.structural_fingerprint)
+
+
+def test_save_and_find_snapshots(tmp_path):
+    from alscan.versioner import build_snapshot, save_snapshot, find_snapshots, load_snapshot
+    proj = parse_als(FIXTURES / "clean.als")
+    p1 = save_snapshot(proj, tmp_path)
+    assert p1.exists()
+    assert p1.suffix == ".json"
+    assert p1.parent.name == "snapshots"
+    snaps = find_snapshots(tmp_path)
+    assert len(snaps) == 1
+    loaded = load_snapshot(snaps[0])
+    assert loaded.tempo == 120.0
+
+
+def test_diff_same_project_no_changes():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    proj_a = parse_als(FIXTURES / "clean.als")
+    proj_b = parse_als(FIXTURES / "clean.als")
+    snap_a = build_snapshot(proj_a)
+    snap_b = build_snapshot(proj_b)
+    result = diff_snapshots(snap_a, snap_b)
+    assert not result.has_changes
+
+
+def test_diff_different_projects():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    clean = build_snapshot(parse_als(FIXTURES / "clean.als"))
+    all_chk = build_snapshot(parse_als(FIXTURES / "all_checks.als"))
+    result = diff_snapshots(clean, all_chk)
+    assert result.has_changes
+    assert result.tempo_changed
+    assert result.tempo_before == 120.0
+    assert result.tempo_after == 250.0
+    assert len(result.track_changes) > 0
+
+
+# -- Versioning schema / validation tests --
+
+def test_snapshot_from_json_validates_format_version():
+    from alscan.versioner import Snapshot, SNAPSHOT_FORMAT_VERSION
+    data = '{"format_version":"0","project_name":"x","timestamp":1.0,"structural_fingerprint":"abc","creator":"","major_version":"","minor_version":"","tempo":120.0,"time_signature":[4,4],"tracks":[],"locators":[]}'
+    with pytest.raises(ValueError, match="Unsupported snapshot format version"):
+        Snapshot.from_json(data)
+
+
+def test_snapshot_from_json_rejects_missing_fields():
+    from alscan.versioner import Snapshot
+    with pytest.raises(ValueError, match="Snapshot missing required fields"):
+        Snapshot.from_json('{"format_version":"1"}')
+
+
+def test_snapshot_from_json_rejects_extra_fields():
+    from alscan.versioner import Snapshot
+    data = '{"format_version":"1","project_name":"x","timestamp":1.0,"structural_fingerprint":"abc","creator":"","major_version":"","minor_version":"","tempo":120.0,"time_signature":[4,4],"tracks":[],"locators":[],"extra":"bad"}'
+    with pytest.raises(ValueError, match="has unknown fields"):
+        Snapshot.from_json(data)
+
+
+def test_snapshot_from_json_rejects_type_mismatch():
+    from alscan.versioner import Snapshot
+    data = '{"format_version":"1","project_name":"x","timestamp":"not_a_number","structural_fingerprint":"abc","creator":"","major_version":"","minor_version":"","tempo":120.0,"time_signature":[4,4],"tracks":[],"locators":[]}'
+    with pytest.raises(TypeError, match="expected.*got str"):
+        Snapshot.from_json(data)
+
+
+def test_snapshot_filename_includes_uuid(tmp_path):
+    from alscan.versioner import build_snapshot, save_snapshot
+    proj = parse_als(FIXTURES / "clean.als")
+    p1 = save_snapshot(proj, tmp_path)
+    parts = p1.stem.split("-")
+    assert len(parts) >= 3
+    assert len(parts[-1]) == 12
+
+
+def test_save_snapshot_is_not_overwritten(tmp_path):
+    from alscan.versioner import build_snapshot, save_snapshot
+    proj = parse_als(FIXTURES / "clean.als")
+    p1 = save_snapshot(proj, tmp_path)
+    p2 = save_snapshot(proj, tmp_path)
+    assert p1.name != p2.name
+
+
+def test_find_snapshots_ignores_corrupt_files(tmp_path):
+    from alscan.versioner import save_snapshot, find_snapshots
+    proj = parse_als(FIXTURES / "clean.als")
+    save_snapshot(proj, tmp_path)
+    bad = tmp_path / ".alscan" / "snapshots" / "corrupt.json"
+    bad.parent.mkdir(parents=True, exist_ok=True)
+    bad.write_text("not valid json")
+    snaps = find_snapshots(tmp_path)
+    # Should still find the valid one, ignore corrupt
+    assert len(snaps) == 1
+
+
+def test_find_snapshots_chronological_order(tmp_path):
+    from alscan.versioner import build_snapshot, save_snapshot, find_snapshots
+    proj = parse_als(FIXTURES / "clean.als")
+    p1 = save_snapshot(proj, tmp_path)
+    import time as ttime
+    ttime.sleep(0.01)
+    p2 = save_snapshot(proj, tmp_path)
+    snaps = find_snapshots(tmp_path)
+    # Most recent first
+    assert snaps[0].name == p2.name
+    assert snaps[1].name == p1.name
+
+
+def test_diff_track_added():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    clean = build_snapshot(parse_als(FIXTURES / "clean.als"))
+    all_chk = build_snapshot(parse_als(FIXTURES / "all_checks.als"))
+    result = diff_snapshots(clean, all_chk)
+    added = [t for t in result.track_changes if t.kind == "added"]
+    assert len(added) > 0
+    assert any(t.name == "Warped Track" for t in added)
+
+
+# -- Report output / atomic write tests --
+
+def test_atomic_write_report_concurrent_writers(tmp_path):
+    """Verify atomic no-clobber: exactly one of N concurrent writers succeeds."""
+    from concurrent.futures import ThreadPoolExecutor
+    from alscan.cli import _atomic_write_report
+
+    dest = tmp_path / "report.html"
+    num_writers = 10
+
+    def writer(worker_id: int) -> bool:
+        content = f"Report from worker {worker_id}"
+        try:
+            _atomic_write_report(dest, content)
+            return True
+        except FileExistsError:
+            return False
+
+    with ThreadPoolExecutor(max_workers=num_writers) as pool:
+        results = list(pool.map(writer, range(num_writers)))
+
+    success_count = sum(results)
+    assert success_count == 1, f"Expected 1 writer to succeed, got {success_count}"
+
+    assert dest.exists(), "Destination file was not created"
+    content = dest.read_text()
+    assert content.startswith("Report from worker "), f"Unexpected content: {content}"
+    worker_id = content.replace("Report from worker ", "").strip()
+    assert worker_id.isdigit()
+
+    stale = list(tmp_path.glob(".*.tmp.*"))
+    assert len(stale) == 0, f"Stale temporary files remain: {stale}"
+
+
+def test_atomic_write_report_existing_fails(tmp_path):
+    """Writing to an existing destination raises FileExistsError."""
+    from alscan.cli import _atomic_write_report
+    dest = tmp_path / "report.html"
+    dest.write_text("original content")
+    with pytest.raises(FileExistsError):
+        _atomic_write_report(dest, "new content")
+    assert dest.read_text() == "original content"
+
+
+def test_atomic_write_report_creates_parent_dirs(tmp_path):
+    """Parent directories are created automatically."""
+    from alscan.cli import _atomic_write_report
+    dest = tmp_path / "sub" / "nested" / "report.html"
+    _atomic_write_report(dest, "hello")
+    assert dest.read_text() == "hello"
+    stale = list(tmp_path.glob("**/.*.tmp.*"))
+    assert len(stale) == 0
+
+
+# -- Report output safety tests --
+
+def test_safe_report_output_rejects_existing_file(tmp_path):
+    from alscan.cli import _safe_report_output
+    source = tmp_path / "project.als"
+    source.write_text("")
+    dest = tmp_path / "report.html"
+    dest.write_text("existing")
+    with pytest.raises(SystemExit):
+        _safe_report_output(str(dest), source)
+    assert dest.read_text() == "existing"
+
+
+def test_safe_report_output_rejects_source_als(tmp_path):
+    from alscan.cli import _safe_report_output
+    source = tmp_path / "project.als"
+    source.write_text("")
+    with pytest.raises(SystemExit):
+        _safe_report_output(str(source), source)
+
+
+def test_safe_report_output_rejects_ableton_extension(tmp_path):
+    from alscan.cli import _safe_report_output
+    source = tmp_path / "project.als"
+    source.write_text("")
+    with pytest.raises(SystemExit):
+        _safe_report_output(str(tmp_path / "report.wav"), source)
+
+
+def test_safe_report_output_rejects_backup_dir(tmp_path):
+    from alscan.cli import _safe_report_output
+    source = tmp_path / "project.als"
+    source.write_text("")
+    backup_dir = tmp_path / "Backup"
+    backup_dir.mkdir()
+    with pytest.raises(SystemExit):
+        _safe_report_output(str(backup_dir / "report.html"), source)
+
+
+def test_safe_report_output_rejects_alscan_dir(tmp_path):
+    from alscan.cli import _safe_report_output
+    source = tmp_path / "project.als"
+    source.write_text("")
+    alscan_dir = tmp_path / ".alscan"
+    alscan_dir.mkdir()
+    with pytest.raises(SystemExit):
+        _safe_report_output(str(alscan_dir / "report.html"), source)
+
+
+# -- Recursive + --output rejection --
+
+def test_recursive_output_rejected():
+    from click.testing import CliRunner
+    from alscan.cli import cli
+    runner = CliRunner()
+    result = runner.invoke(cli, ["scan", "/nonexistent", "--recursive", "--output", "out.html"])
+    assert result.exit_code == 1
+    assert "--output is not supported with --recursive" in result.output
+
+
+# -- Ambiguous project error --
+
+def test_ambiguous_project_error(tmp_path):
+    from alscan.cli import _resolve_als_path
+    (tmp_path / "song1.als").write_text("")
+    (tmp_path / "song2.als").write_text("")
+    result = _resolve_als_path(str(tmp_path))
+    assert result is None
+
+
+# -- Snapshot with corrupt .als --
+
+def test_snapshot_corrupt_als(tmp_path):
+    from alscan.cli import _resolve_als
+    corrupt = tmp_path / "corrupt.als"
+    corrupt.write_bytes(b"not a gzip file")
+    from alscan.cli import snapshot
+    from click.testing import CliRunner
+    from alscan.cli import cli
+    runner = CliRunner()
+    result = runner.invoke(cli, ["snapshot", str(corrupt)])
+    assert result.exit_code == 1
+    assert "Error parsing" in result.output
+
+
+# -- _load_any with corrupt snapshot --
+
+def test_load_any_corrupt_snapshot(tmp_path):
+    from alscan.cli import _load_any
+    snap = tmp_path / "snapshot.json"
+    snap.write_text("not valid json")
+    with pytest.raises(SystemExit):
+        _load_any(str(snap))
+
+
+# -- _load_any with directory --
+
+def test_load_any_directory_fails_with_controlled_message(tmp_path):
+    """Passing a directory to diff produces controlled error, no traceback, no files."""
+    from click.testing import CliRunner
+    from alscan.cli import cli
+    d = tmp_path / "my_project"
+    d.mkdir()
+    result = CliRunner().invoke(cli, ["diff", str(d), str(d / "nonexistent.als")])
+    assert result.exit_code == 1
+    assert "Expected an .als project file" in result.output
+    assert "but received a directory" in result.output
+    assert str(d) in result.output
+    assert "Traceback" not in result.output
+    children = list(tmp_path.iterdir())
+    assert children == [d]
+
+
+# -- os.link failure handling --
+
+def test_atomic_write_report_oserror_handled(tmp_path):
+    """Verify OSError from os.link produces clean error (no traceback to user)."""
+    from alscan.cli import _atomic_write_report
+    dest = tmp_path / "report.html"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text("existing")
+    with pytest.raises(FileExistsError):
+        _atomic_write_report(dest, "new content")
+    stale = list(tmp_path.glob(".*.tmp.*"))
+    assert len(stale) == 0, f"Stale temp files remain: {stale}"
+    assert dest.read_text() == "existing"
+
+
+# -- Locator diff tests --
+
+def test_diff_locator_changes():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    xml_a = """<?xml version="1.0" encoding="UTF-8"?>
+<Ableton MajorVersion="5" MinorVersion="12" Creator="Ableton Live 12">
+  <LiveSet>
+    <Tempo><Manual Value="120"/></Tempo>
+    <TimeSignature>
+      <TimeSignatures>
+        <RemoteableTimeSignature>
+          <Numerator Value="4"/><Denominator Value="4"/>
+        </RemoteableTimeSignature>
+      </TimeSignatures>
+    </TimeSignature>
+    <Locators>
+      <Locators>
+        <Locator>
+          <Name><EffectiveName Value="Verse"/></Name>
+          <Time Value="8.0"/>
+        </Locator>
+      </Locators>
+    </Locators>
+    <Tracks/>
+  </LiveSet>
+</Ableton>"""
+    xml_b = """<?xml version="1.0" encoding="UTF-8"?>
+<Ableton MajorVersion="5" MinorVersion="12" Creator="Ableton Live 12">
+  <LiveSet>
+    <Tempo><Manual Value="120"/></Tempo>
+    <TimeSignature>
+      <TimeSignatures>
+        <RemoteableTimeSignature>
+          <Numerator Value="4"/><Denominator Value="4"/>
+        </RemoteableTimeSignature>
+      </TimeSignatures>
+    </TimeSignature>
+    <Locators>
+      <Locators>
+        <Locator>
+          <Name><EffectiveName Value="Verse"/></Name>
+          <Time Value="8.0"/>
+        </Locator>
+        <Locator>
+          <Name><EffectiveName Value="Chorus"/></Name>
+          <Time Value="16.0"/>
+        </Locator>
+      </Locators>
+    </Locators>
+    <Tracks/>
+  </LiveSet>
+</Ableton>"""
+    proj_a = parse_xml_string(xml_a)
+    proj_b = parse_xml_string(xml_b)
+    snap_a = build_snapshot(proj_a)
+    snap_b = build_snapshot(proj_b)
+    result = diff_snapshots(snap_a, snap_b)
+    assert result.locators_changed
+    assert len(result.added_locators) == 1
+    assert result.added_locators[0]["name"] == "Chorus"
+    assert len(result.removed_locators) == 0
+
+
+def test_diff_locator_removed():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    xml_a = """<?xml version="1.0" encoding="UTF-8"?>
+<Ableton MajorVersion="5" MinorVersion="12" Creator="Ableton Live 12">
+  <LiveSet>
+    <Tempo><Manual Value="120"/></Tempo>
+    <TimeSignature>
+      <TimeSignatures>
+        <RemoteableTimeSignature>
+          <Numerator Value="4"/><Denominator Value="4"/>
+        </RemoteableTimeSignature>
+      </TimeSignatures>
+    </TimeSignature>
+    <Locators>
+      <Locators>
+        <Locator>
+          <Name><EffectiveName Value="Intro"/></Name>
+          <Time Value="0.0"/>
+        </Locator>
+      </Locators>
+    </Locators>
+    <Tracks/>
+  </LiveSet>
+</Ableton>"""
+    xml_b = """<?xml version="1.0" encoding="UTF-8"?>
+<Ableton MajorVersion="5" MinorVersion="12" Creator="Ableton Live 12">
+  <LiveSet>
+    <Tempo><Manual Value="120"/></Tempo>
+    <TimeSignature>
+      <TimeSignatures>
+        <RemoteableTimeSignature>
+          <Numerator Value="4"/><Denominator Value="4"/>
+        </RemoteableTimeSignature>
+      </TimeSignatures>
+    </TimeSignature>
+    <Locators>
+      <Locators/>
+    </Locators>
+    <Tracks/>
+  </LiveSet>
+</Ableton>"""
+    proj_a = parse_xml_string(xml_a)
+    proj_b = parse_xml_string(xml_b)
+    snap_a = build_snapshot(proj_a)
+    snap_b = build_snapshot(proj_b)
+    result = diff_snapshots(snap_a, snap_b)
+    assert result.locators_changed
+    assert len(result.removed_locators) == 1
+    assert result.removed_locators[0]["name"] == "Intro"
+
+
+def test_diff_locator_has_changes():
+    """Locator-only changes must be detected (no false 'no differences')."""
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<Ableton MajorVersion="5" MinorVersion="12" Creator="Ableton Live 12">
+  <LiveSet>
+    <Tempo><Manual Value="120"/></Tempo>
+    <TimeSignature>
+      <TimeSignatures>
+        <RemoteableTimeSignature>
+          <Numerator Value="4"/><Denominator Value="4"/>
+        </RemoteableTimeSignature>
+      </TimeSignatures>
+    </TimeSignature>
+    <Locators>
+      <Locators>
+        <Locator>
+          <Name><EffectiveName Value="Drop"/></Name>
+          <Time Value="32.0"/>
+        </Locator>
+      </Locators>
+    </Locators>
+    <Tracks/>
+  </LiveSet>
+</Ableton>"""
+    proj = parse_xml_string(xml)
+    snap_a = build_snapshot(proj)
+    snap_b = build_snapshot(proj)
+    result = diff_snapshots(snap_a, snap_b)
+    assert not result.has_changes
