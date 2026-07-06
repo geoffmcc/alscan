@@ -187,6 +187,14 @@ Review reports before sharing them.  Snapshots are stored locally in `.alscan/` 
 - Long paths (>260 chars) on Windows are not handled — use Python 3.12+ or short paths
 - `Path.is_junction()` (Windows) requires Python 3.12
 
+## Uninstall
+
+```bash
+pip uninstall alscan
+```
+
+If you used a standalone PyInstaller build (macOS `.dmg` or Windows `.exe`), simply delete the downloaded file — it is fully self-contained and makes no system modifications.
+
 ## Development
 
 ```bash
