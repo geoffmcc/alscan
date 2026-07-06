@@ -1,4 +1,4 @@
-"""Generate .als test fixtures for all 15 alscan checks.
+"""Generate .als test fixtures for all 19 alscan checks.
 
 Usage: python -m tests.fixtures.generate
 """
@@ -21,9 +21,11 @@ def make_als_xml(
     tempo: float = 120.0,
     ts_num: int = 4,
     ts_den: int = 4,
+    has_locators: bool = True,
 ) -> str:
     """Build a complete .als XML string from track XML strings."""
     track_xmls = "\n".join(tracks)
+    locators_xml = "    <Locators>\n      <Locators/>\n    </Locators>" if has_locators else "    <Locators><Locators/></Locators>"
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <Ableton Creator="{creator}" MajorVersion="{major}" MinorVersion="{minor}">
   <LiveSet>
@@ -38,9 +40,7 @@ def make_als_xml(
         </RemoteableTimeSignature>
       </TimeSignatures>
     </TimeSignature>
-    <Locators>
-      <Locators/>
-    </Locators>
+    {locators_xml}
     <Tracks>
 {track_xmls}
     </Tracks>
@@ -111,6 +111,20 @@ def group_track(track_id: int, name: str = "", color: int = 3) -> str:
   </GroupTrack>"""
 
 
+def master_track(devices: str = "") -> str:
+    return f"""    <MasterTrack Id="-1">
+    <Name><EffectiveName Value="Master"/></Name>
+    <ColorIndex Value="5"/>
+    <DeviceChain>
+      <Devices>
+{devices}      </Devices>
+      <MainSequencer>
+        <ClipSlotList/>
+      </MainSequencer>
+    </DeviceChain>
+  </MasterTrack>"""
+
+
 def return_track(track_id: int, name: str = "", clips: str = "", color: int = 4) -> str:
     name_el = f'    <Name><EffectiveName Value="{name}"/></Name>\n' if name else '    <Name><EffectiveName Value=""/></Name>\n'
     return f"""    <ReturnTrack Id="{track_id}">
@@ -132,8 +146,10 @@ def return_track(track_id: int, name: str = "", clips: str = "", color: int = 4)
 def audio_clip(clip_name: str = "", sample_path: str = "",
                sample_name: str = "", relative_path: str = "",
                rpt: int = 1, size: int = 12345, crc: int = 67890,
-               pack_name: str = "", duration: float = 8.0) -> str:
+               pack_name: str = "", duration: float = 8.0,
+               warped: bool = False) -> str:
     sample_block = ""
+    warp_el = '      <IsWarped Value="true"/>\n' if warped else ""
     if sample_path:
         name_block = f'        <Name Value="{sample_name}"/>\n' if sample_name else ""
         pack_block = f'        <LivePackName Value="{pack_name}"/>\n' if pack_name else ""
@@ -155,7 +171,7 @@ def audio_clip(clip_name: str = "", sample_path: str = "",
                 <AudioClip Time="0.0">
                   <Name Value="{clip_name}"/>
                   <ColorIndex Value="1"/>
-{sample_block}                  <Loop>
+{warp_el}{sample_block}                  <Loop>
                     <LoopEnd Value="{duration}"/>
                     <LoopOn Value="false"/>
                   </Loop>
@@ -244,6 +260,7 @@ def generate_all_checks_project():
     clips_missing = audio_clip("Missing Clip", BROKEN_SAMPLE, BROKEN_SAMPLE_NAME, "nonexistent/sample.wav", 1)
     clips_shared = audio_clip("Loop Clip", DUPLICATE_SAMPLE_PATH, "loop", "shared/loop.wav", 1)
     clips_pack = audio_clip("Pack Clip", PACK_SAMPLE_PATH, "Pack Sample", "", 2, pack_name="Factory Pack")
+    clips_warped = audio_clip("Warped Loop", GOOD_SAMPLE, GOOD_SAMPLE_NAME, "Samples/kick.wav", 1, warped=True)
     clips_midi = midi_clip("MIDI 1", 4.0)
 
     # 21 clips to trigger unfrozen_heavy_tracks (21 > 20)
@@ -304,9 +321,14 @@ def generate_all_checks_project():
 
         # [12] Pack Sample Track — pack sample not found (missing_pack_samples)
         audio_track(12, "Pack Track", clips=clips_pack),
+
+        # [13] Warped Track — warped audio clip (warped_clips)
+        audio_track(13, "Warped Track", clips=clips_warped),
     ]
 
-    xml = make_als_xml(tracks)
+    master = master_track(devices=builtin_device("Limiter"))
+
+    xml = make_als_xml(tracks + [master], tempo=250.0, has_locators=False)
     return write_als("all_checks.als", xml)
 
 
@@ -325,7 +347,7 @@ def generate():
     print(f"  {clean.name} — clean project (0 findings)")
 
     all_chk = generate_all_checks_project()
-    print(f"  {all_chk.name} — exercises all 15 checks")
+    print(f"  {all_chk.name} — exercises all 19 checks")
 
     frozen = generate_frozen_returns_project()
     print(f"  {frozen.name} — return with clips (no unused_returns)")
