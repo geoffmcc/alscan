@@ -34,18 +34,22 @@ alscan scan "~/Ableton Projects/My Song Project/" --format html --browser
 # Scan all projects under a folder
 alscan scan "~/Ableton Projects/" --recursive
 
+> **Note**: `--output` is not supported with `--recursive`. Each project's report is printed to stdout only.
+
 # List all available checks
 alscan list-checks
 
 # Capture a project snapshot
 alscan snapshot "~/Ableton Projects/My Song Project/"
 
-# Compare two projects or snapshots
-alscan diff "My Song Project v1/" "My Song Project v2/"
+# Compare two .als project files
+alscan diff "My Song.als" "My Song Backups/v2.als"
 
 # View snapshot history
 alscan log "My Song Project/"
 ```
+
+> **Troubleshooting**: If `alscan scan <directory>` says "Multiple .als files found", the directory contains more than one project. Pass the explicit path to the `.als` file instead: `alscan scan "~/Ableton Projects/My Song/My Song.als"`.
 
 ## Output Example
 
@@ -133,14 +137,24 @@ The JSON includes project metadata, track counts, and all findings with severity
 
 Track your project's evolution with snapshot, diff, and log commands.
 
+> **Note**: The `snapshot` command creates an `.alscan/snapshots/` directory in the project folder. This directory is excluded from Git via `.gitignore`.
+
 ```bash
 # Save a structural snapshot of the project
 alscan snapshot "My Song/"
 # → Writes .alscan/snapshots/My Song-<timestamp>-<uuid>.json
 
-# Compare a project against its snapshot, or two .als files
-alscan diff "My Song/" "My Song Backups/v2/"
-# → Shows: tempo changes, track adds/removes, device/clip count changes
+# Compare two .als project files
+alscan diff "My Song.als" "My Song Backups/v2.als"
+
+# Compare a project against a previous snapshot
+alscan diff "My Song.als" "My Song/.alscan/snapshots/My Song-20260706-abc123.json"
+
+# Compare two snapshots
+alscan diff "My Song/.alscan/snapshots/v1.json" "My Song/.alscan/snapshots/v2.json"
+
+# → Shows: tempo, time signature, locator, track, device, and clip count changes
+#   (structural metadata only — not a complete Ableton project comparison)
 
 # View snapshot history
 alscan log "My Song/"

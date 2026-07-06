@@ -236,6 +236,11 @@ class DiffResult:
     time_sig_changed: bool = False
     ts_before: list[int] = None
     ts_after: list[int] = None
+    locators_changed: bool = False
+    locators_before: list[dict] = None
+    locators_after: list[dict] = None
+    added_locators: list[dict] = None
+    removed_locators: list[dict] = None
     track_changes: list[TrackChange] = None
 
     def __post_init__(self):
@@ -245,10 +250,18 @@ class DiffResult:
             self.ts_before = [4, 4]
         if self.ts_after is None:
             self.ts_after = [4, 4]
+        if self.locators_before is None:
+            self.locators_before = []
+        if self.locators_after is None:
+            self.locators_after = []
+        if self.added_locators is None:
+            self.added_locators = []
+        if self.removed_locators is None:
+            self.removed_locators = []
 
     @property
     def has_changes(self) -> bool:
-        return self.tempo_changed or self.time_sig_changed or bool(self.track_changes)
+        return self.tempo_changed or self.time_sig_changed or self.locators_changed or bool(self.track_changes)
 
 
 def diff_snapshots(a: Snapshot, b: Snapshot) -> DiffResult:
@@ -266,6 +279,15 @@ def diff_snapshots(a: Snapshot, b: Snapshot) -> DiffResult:
         result.time_sig_changed = True
         result.ts_before = a.time_signature
         result.ts_after = b.time_signature
+
+    if a.locators != b.locators:
+        result.locators_changed = True
+        result.locators_before = a.locators
+        result.locators_after = b.locators
+        a_set = {(loc["name"], loc.get("time", 0.0)) for loc in a.locators}
+        b_set = {(loc["name"], loc.get("time", 0.0)) for loc in b.locators}
+        result.added_locators = [dict(name=n, time=t) for n, t in b_set - a_set]
+        result.removed_locators = [dict(name=n, time=t) for n, t in a_set - b_set]
 
     a_tracks = {t["track_id"]: t for t in a.tracks}
     b_tracks = {t["track_id"]: t for t in b.tracks}

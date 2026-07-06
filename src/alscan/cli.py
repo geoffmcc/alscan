@@ -88,7 +88,9 @@ def _safe_report_output(output_path: str, source_als: Path) -> Path:
 
     Returns the resolved Path if safe, or prints an error and exits.
     """
-    p = Path(output_path).resolve()
+    p = Path(output_path)
+    _validate_parent(p)
+    p = p.resolve()
     source = source_als.resolve()
 
     if p == source:
@@ -111,8 +113,6 @@ def _safe_report_output(output_path: str, source_als: Path) -> Path:
                 err=True,
             )
             sys.exit(1)
-
-    _validate_parent(p)
 
     if p.exists():
         click.echo(
@@ -209,11 +209,21 @@ def _scan_single(path: str, fmt: str, open_browser: bool, output_path: str,
     elapsed = (time.time() - start) * 1000
     result = ScanResult(project=project, findings=findings, scan_time_ms=round(elapsed, 1))
 
+    def _write(dest: Path, content: str) -> None:
+        try:
+            _atomic_write_report(dest, content)
+        except OSError as e:
+            click.echo(
+                f"Error: could not write report to {dest} — {e}",
+                err=True,
+            )
+            click.echo("  Report was not written. No fallback was attempted.", err=True)
+
     if fmt == "json":
         text = generate_json_report(result, pretty=pretty)
         if output_path:
             dest = _safe_report_output(output_path, als_file)
-            _atomic_write_report(dest, text)
+            _write(dest, text)
         else:
             click.echo(text)
     elif fmt == "html":
@@ -224,16 +234,17 @@ def _scan_single(path: str, fmt: str, open_browser: bool, output_path: str,
             dest = _safe_report_output(
                 str(als_file.parent / "alscan-report.html"), als_file,
             )
-        _atomic_write_report(dest, html)
-        click.echo(f"HTML report written to: {dest}", err=True)
-        if open_browser:
+        _write(dest, html)
+        if dest.exists():
+            click.echo(f"HTML report written to: {dest}", err=True)
+        if open_browser and dest.exists():
             import webbrowser
             webbrowser.open(dest.as_uri())
     else:
         text = print_terminal_report(result, verbose=verbose)
         if output_path:
             dest = _safe_report_output(output_path, als_file)
-            _atomic_write_report(dest, text)
+            _write(dest, text)
         else:
             click.echo(text)
 
@@ -292,6 +303,13 @@ def _resolve_als(path: str) -> Path:
 
 def _load_any(path: str) -> Snapshot:
     p = Path(path).resolve()
+    if p.is_dir():
+        click.echo(
+            "Expected an .als project file or alscan snapshot .json file, "
+            f"but received a directory: {p}",
+            err=True,
+        )
+        sys.exit(1)
     if p.suffix == ".json":
         try:
             snap = load_snapshot(p)
@@ -318,8 +336,16 @@ def _load_any(path: str) -> Snapshot:
 def snapshot(path: str) -> None:
     """Capture a snapshot of a project's structure."""
     als_file = _resolve_als(path)
-    proj = parse_als(als_file)
-    dest = save_snapshot(proj, als_file.parent)
+    try:
+        proj = parse_als(als_file)
+    except Exception as e:
+        click.echo(f"Error parsing {als_file}: {e}", err=True)
+        sys.exit(1)
+    try:
+        dest = save_snapshot(proj, als_file.parent)
+    except Exception as e:
+        click.echo(f"Error saving snapshot: {e}", err=True)
+        sys.exit(1)
     click.echo(f"Snapshot saved: {dest}")
 
 
@@ -329,10 +355,10 @@ def snapshot(path: str) -> None:
 def diff(path_a: str, path_b: str) -> None:
     """Compare two projects or snapshots.
 
-    Compares structural metadata (tempo, time signature, track layout,
-    track names, device/clip counts).  Does NOT compare automation,
-    MIDI notes, audio content, routing, send levels, or plugin
-    parameter values.
+    Compares structural metadata (tempo, time signature, locators,
+    track layout, track names, device/clip counts).  Does NOT compare
+    automation, MIDI notes, audio content, routing, send levels, or
+    plugin parameter values.
 
     Arguments may be paths to .als files or snapshot .json files.
     """
@@ -352,6 +378,14 @@ def diff(path_a: str, path_b: str) -> None:
 
     if result.time_sig_changed:
         click.echo(f"  Time Sig: {result.ts_before[0]}/{result.ts_before[1]} -> {result.ts_after[0]}/{result.ts_after[1]}")
+
+    if result.locators_changed:
+        click.echo()
+        click.echo("  Locator changes:")
+        for loc in result.added_locators:
+            click.echo(f'    + "{loc["name"]}" at {loc["time"]:.1f}')
+        for loc in result.removed_locators:
+            click.echo(f'    - "{loc["name"]}" at {loc["time"]:.1f}')
 
     if result.track_changes:
         click.echo()

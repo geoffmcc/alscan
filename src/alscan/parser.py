@@ -113,7 +113,7 @@ def _parse_locators(live_set, proj):
     if loc_inner is None:
         return
     for loc in loc_inner.findall("Locator"):
-        name = _gv(loc, "Name", "Value", "")
+        name = _gv(loc, "Name/EffectiveName", "Value", "")
         time_str = _gv(loc, "Time", "Value", "0")
         try:
             time_val = float(time_str)
