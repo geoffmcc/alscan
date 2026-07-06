@@ -1,0 +1,48 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# C extensions
+*.pyd
+*.dll
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+
+# pyproject.toml build artifacts
+pip-wheel-metadata/
+share/python-wheels/
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+*.cover
+coverage.xml
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Generated reports
+*alscan-report*.html
+
+# Temp test files
+tests/tmp/

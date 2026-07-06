@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alscan"
+version = "0.1.0"
+description = "Ableton Live Project Health Scanner — analyze, version, and merge .als files"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12"
+authors = [{ name = "geoffmcc" }]
+keywords = ["ableton", "live", "als", "music", "production", "scanner", "analysis"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "click>=8",
+    "lxml>=5",
+    "rich>=13",
+    "jinja2>=3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+]
+
+[project.urls]
+Homepage = "https://github.com/geoffmcc/alscan"
+Source = "https://github.com/geoffmcc/alscan"
+Issues = "https://github.com/geoffmcc/alscan/issues"
+
+[project.scripts]
+alscan = "alscan.cli:cli"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"alscan" = ["report/templates/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
