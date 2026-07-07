@@ -4,7 +4,7 @@ from pathlib import Path
 
 from alscan.checks import Finding, register
 from alscan.models import Project
-from alscan.platform import known_plugin_dirs
+from alscan.plugindirs import known_plugin_dirs
 
 
 @register("broken_plugins", severity="error", description="VST/AU plugins referenced but not found on disk")
