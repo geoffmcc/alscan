@@ -54,7 +54,10 @@ alscan snapshot "~/Ableton Projects/My Song/"
 # Compare two project versions
 alscan diff "My Song.als" "My Song Backups/v2.als"
 
-# Experimental: three-way structural conflict report
+# Experimental: output a JSON merge plan
+alscan merge-plan base.als ours.als theirs.als --output plan.json
+
+# Experimental: render an HTML conflict report
 alscan merge-report base.als ours.als theirs.als --output report.html
 ```
 
@@ -81,7 +84,8 @@ alscan merge-report base.als ours.als theirs.als --output report.html
 | `snapshot` | Save a structural metadata snapshot of a project | Stable |
 | `diff` | Compare two `.als` files or snapshots | Stable |
 | `log` | View snapshot history for a project | Stable |
-| `merge-report` | Experimental three-way structural conflict analysis | Experimental |
+| `merge-plan` | Analyze three versions and output a JSON merge plan | Experimental |
+| `merge-report` | Analyze three versions and render an HTML conflict report | Experimental |
 
 ## Output Examples
 
@@ -192,6 +196,8 @@ alscan merge-report BASE OURS THEIRS --output report.html
 
 `BASE`, `OURS`, and `THEIRS` may be `.als` files or alscan snapshot `.json` files — all three must be the same type.
 
+Pass `--allow-unrelated` to analyze projects that do not share common ancestry (this will flag nearly everything as a conflict or addition).
+
 ### What it produces
 
 An offline HTML report rendered from the MergePlan v2 document model:
@@ -223,13 +229,27 @@ Source file paths are reduced to basenames. Plugin-state data is redacted.
 
 Create merged metadata, modify `.als` files, write XML, apply conflicts, interpret plugin state, or reconstruct Ableton projects.
 
+## Merge Plan (experimental)
+
+> ⚠️ **Experimental.** Same analysis engine as `merge-report`, but outputs a JSON merge plan instead of an HTML report.
+
+```bash
+alscan merge-plan BASE OURS THEIRS --output plan.json
+```
+
+Accepts the same inputs and `--allow-unrelated` flag as `merge-report`. The JSON output follows the MergePlan v2 schema and is intended for programmatic consumption or further tooling.
+
+This command does not modify any input file.
+
 ## Platform Compatibility
 
-| OS | Status |
-|----|--------|
-| Windows | Tested via WSL; Python 3.14+ |
-| macOS | Manual testing needed |
-| Linux | CI-tested; Ableton does not run here |
+| OS | Python install | Standalone binary |
+|----|---------------|-------------------|
+| Windows | Python 3.12+ via WSL | `.exe` on Releases |
+| macOS | Manual testing needed | `.dmg` on Releases |
+| Linux | Python 3.12+; CI-tested (Ubuntu) | Not provided |
+
+Ableton Live does not run on Linux, but you can use `alscan` on a Linux server to scan or diff project files stored on a shared drive.
 
 **Known limitations**:
 - Atomic file operations (`os.link`) require both paths on the same filesystem volume
@@ -276,8 +296,8 @@ python -m build
 
 - **v0.1** ✅ Project health scanning
 - **v0.2** ✅ Extended checks, JSON output, exit codes
-- **v0.3** ✅ Project versioning (snapshot / diff / log) — development
-- **v0.4** ✅ Experimental three-way structural analysis and offline conflict reporting — development
+- **v0.3** ✅ Project versioning (snapshot / diff / log)
+- **v0.4** 🚧 Experimental three-way structural analysis and offline conflict reporting
 
 ## License
 
