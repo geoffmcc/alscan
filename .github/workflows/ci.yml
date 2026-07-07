@@ -38,7 +38,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-latest
+          - os: macos-26
             exe_name: alscan-macos
           - os: windows-latest
             exe_name: alscan-windows.exe
