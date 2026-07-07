@@ -493,3 +493,7 @@ def merge_report_command(base: str, ours: str, theirs: str,
 
     if plan.conflict_count > 0:
         sys.exit(3)
+
+
+if __name__ == "__main__":
+    cli()

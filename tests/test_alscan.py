@@ -496,6 +496,37 @@ def test_diff_track_added():
     assert any(t.name == "Warped Track" for t in added)
 
 
+# -- CLI entry point tests --
+
+def test_cli_as_script():
+    """cli.py entry-point guard works: running it as a script produces help output."""
+    import subprocess
+    import sys
+    cli_path = Path(__file__).parent.parent / "src" / "alscan" / "cli.py"
+    r = subprocess.run(
+        [sys.executable, str(cli_path), "--help"],
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 0
+    assert len(r.stdout) > 0
+    assert "Ableton Live Project Health Scanner" in r.stdout
+    assert "Commands:" in r.stdout
+
+
+def test_cli_as_script_version():
+    """cli.py --version returns correct version."""
+    import subprocess
+    import sys
+    cli_path = Path(__file__).parent.parent / "src" / "alscan" / "cli.py"
+    r = subprocess.run(
+        [sys.executable, str(cli_path), "--version"],
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 0
+    assert "alscan" in r.stdout
+    assert "0.3.1" in r.stdout
+
+
 # -- Report output / atomic write tests --
 
 def test_atomic_write_report_concurrent_writers(tmp_path):
