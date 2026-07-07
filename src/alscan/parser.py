@@ -78,6 +78,8 @@ def _gv(element, subpath, attr="Value", default=None):
 
 def _parse_tempo(live_set, proj):
     tempo_el = live_set.find("Tempo")
+    if tempo_el is None:
+        tempo_el = live_set.find("MainTrack/DeviceChain/Mixer/Tempo")
     if tempo_el is not None:
         manual = tempo_el.find("Manual")
         if manual is not None:
