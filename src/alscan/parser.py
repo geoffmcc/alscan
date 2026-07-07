@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gzip
 import io
+import math
 from pathlib import Path, PurePath
 
 from lxml import etree
@@ -158,6 +159,7 @@ def _parse_tracks(live_set, proj):
         )
         _parse_devices(child, track)
         _parse_clips(child, track)
+        _parse_mixer(child, track)
         proj.tracks.append(track)
     proj.tracks.sort(key=lambda t: t.track_id)
 
@@ -321,6 +323,25 @@ def _parse_midi_clip(el):
         color_index=color_index, start_time=start_time,
         duration=duration, loop_on=loop_on, notes=notes,
     )
+
+
+def _parse_mixer(track_el, track):
+    mixer = track_el.find("DeviceChain/Mixer")
+    if mixer is None:
+        return
+    vol_el = mixer.find("Volume/Manual")
+    if vol_el is None:
+        return
+    raw = vol_el.get("Value")
+    if raw is None:
+        return
+    try:
+        v = float(raw)
+    except (ValueError, TypeError):
+        return
+    if not math.isfinite(v):
+        return
+    track.volume = v
 
 
 def _parse_sample_ref(el):

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import time
 import uuid
+from collections import Counter
 from dataclasses import asdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -228,6 +230,25 @@ class TrackChange:
 
 
 @dataclass
+class DeviceDiff:
+    track_id: int
+    track_name: str
+    added: list[dict] = None
+    removed: list[dict] = None
+    order_changed: bool = False
+
+    def __post_init__(self):
+        if self.added is None:
+            self.added = []
+        if self.removed is None:
+            self.removed = []
+
+    @property
+    def has_changes(self) -> bool:
+        return bool(self.added) or bool(self.removed) or self.order_changed
+
+
+@dataclass
 class DiffResult:
     project_a: str
     project_b: str
@@ -243,10 +264,13 @@ class DiffResult:
     added_locators: list[dict] = None
     removed_locators: list[dict] = None
     track_changes: list[TrackChange] = None
+    device_changes: list[DeviceDiff] = None
 
     def __post_init__(self):
         if self.track_changes is None:
             self.track_changes = []
+        if self.device_changes is None:
+            self.device_changes = []
         if self.ts_before is None:
             self.ts_before = [4, 4]
         if self.ts_after is None:
@@ -262,7 +286,41 @@ class DiffResult:
 
     @property
     def has_changes(self) -> bool:
-        return self.tempo_changed or self.time_sig_changed or self.locators_changed or bool(self.track_changes)
+        return (self.tempo_changed or self.time_sig_changed or self.locators_changed
+                or bool(self.track_changes) or bool(self.device_changes))
+
+
+def _device_signature(dev: dict) -> tuple:
+    return (dev.get("name"), dev.get("device_type"),
+            dev.get("plugin_name"), dev.get("plugin_type"))
+
+
+def _compare_device_lists(old_devices: list[dict],
+                          new_devices: list[dict]) -> tuple[list[dict], list[dict], bool]:
+    old_sigs = [_device_signature(d) for d in old_devices]
+    new_sigs = [_device_signature(d) for d in new_devices]
+
+    if Counter(old_sigs) == Counter(new_sigs):
+        if old_sigs == new_sigs:
+            return [], [], False
+        return [], [], True
+
+    old_remaining = list(old_devices)
+    added: list[dict] = []
+
+    for new_dev in new_devices:
+        ns = _device_signature(new_dev)
+        matched = False
+        for i, old_dev in enumerate(old_remaining):
+            if _device_signature(old_dev) == ns:
+                old_remaining.pop(i)
+                matched = True
+                break
+        if not matched:
+            added.append(new_dev)
+
+    removed = old_remaining
+    return added, removed, False
 
 
 def diff_snapshots(a: Snapshot, b: Snapshot) -> DiffResult:
@@ -312,13 +370,43 @@ def diff_snapshots(a: Snapshot, b: Snapshot) -> DiffResult:
                 details.append(f'type: {ta["track_type"]} -> {tb["track_type"]}')
             if ta["is_frozen"] != tb["is_frozen"]:
                 details.append(f'frozen: {ta["is_frozen"]} -> {tb["is_frozen"]}')
+
+            vol_a = ta.get("volume", 1.0)
+            vol_b = tb.get("volume", 1.0)
+            if abs(vol_a - vol_b) >= 1e-6:
+                details.append(f'volume: {vol_a} -> {vol_b}')
+
+            group_a = ta.get("group_id", -1)
+            group_b = tb.get("group_id", -1)
+            if group_a != group_b:
+                details.append(f'group_id: {group_a} -> {group_b}')
+
+            col_a = ta.get("color_index", 0)
+            col_b = tb.get("color_index", 0)
+            if col_a != col_b:
+                details.append(f'color: {col_a} -> {col_b}')
+
             if ta["device_count"] != tb["device_count"]:
                 details.append(f'devices: {ta["device_count"]} -> {tb["device_count"]}')
             if ta["clip_count"] != tb["clip_count"]:
                 details.append(f'clips: {ta["clip_count"]} -> {tb["clip_count"]}')
+
             if details:
                 result.track_changes.append(TrackChange(
                     kind="modified", track_id=tid, name=tb["name"], details=details,
                 ))
+
+            old_devs = ta.get("devices", [])
+            new_devs = tb.get("devices", [])
+            if old_devs or new_devs:
+                dev_added, dev_removed, dev_order = _compare_device_lists(old_devs, new_devs)
+                if dev_added or dev_removed or dev_order:
+                    result.device_changes.append(DeviceDiff(
+                        track_id=tid,
+                        track_name=tb["name"],
+                        added=dev_added,
+                        removed=dev_removed,
+                        order_changed=dev_order,
+                    ))
 
     return result

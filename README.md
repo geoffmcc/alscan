@@ -178,13 +178,13 @@ alscan diff "My Song/.alscan/snapshots/v1.json" "My Song/.alscan/snapshots/v2.js
 alscan log "My Song/"
 ```
 
-> Snapshots capture **structural metadata only**: tempo, time signature, creator string, track list with device/clip counts, plugin references, and a structural fingerprint. No audio content.
+> Snapshots capture **structural metadata only**: tempo, time signature, creator string, track list with device details and clip counts, volume, colour, group assignment, plugin references, and a structural fingerprint. No audio content.
 
 > The `.alscan/snapshots/` directory is excluded from Git via `.gitignore`. The `Backup/` folder is excluded from recursive scanning.
 
 ### What `diff` shows
 
-Tempo, time signature, locator, track, device, and clip count changes — structural metadata only, not a complete Ableton project comparison.
+Tempo, time signature, locator, track layout, track names, volume, group assignment, colour, device lists (additions, removals, reordering), device and clip counts. Structural metadata only — not a complete Ableton project comparison.
 
 ## Merge Conflict Report (experimental)
 

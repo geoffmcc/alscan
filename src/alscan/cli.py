@@ -29,6 +29,7 @@ from alscan.versioner import (
     load_snapshot,
     find_snapshots,
     diff_snapshots,
+    DeviceDiff,
     Snapshot,
     SNAPSHOT_FORMAT_VERSION,
 )
@@ -300,6 +301,17 @@ def snapshot(path: str) -> None:
     click.echo(f"Snapshot saved: {dest}")
 
 
+def _device_label(dev: dict) -> str:
+    name = dev.get("name", "")
+    ptype = dev.get("plugin_type")
+    if ptype:
+        return f"{name} ({ptype})"
+    dtype = dev.get("device_type", "")
+    if dtype and dtype != name:
+        return f"{name} ({dtype})"
+    return name
+
+
 @cli.command()
 @click.argument("path_a", type=str, required=True)
 @click.argument("path_b", type=str, required=False, default=None)
@@ -308,9 +320,10 @@ def diff(path_a: str, path_b: str | None, snapshot: int | None) -> None:
     """Compare two projects or snapshots.
 
     Compares structural metadata (tempo, time signature, locators,
-    track layout, track names, device/clip counts).  Does NOT compare
-    automation, MIDI notes, audio content, routing, send levels, or
-    plugin parameter values.
+    track layout, track names, device lists, volume, group assignment,
+    colour, device/clip counts).  Does NOT compare automation, MIDI
+    notes, audio content, routing, send levels, plugin parameter values,
+    or plugin state.
 
     Arguments may be paths to .als files or snapshot .json files.
     """
@@ -366,6 +379,20 @@ def diff(path_a: str, path_b: str | None, snapshot: int | None) -> None:
             click.echo(f"    {sym} [{tc.track_id}] {tc.name}")
             for d in tc.details:
                 click.echo(f"        {d}")
+
+    if result.device_changes:
+        click.echo()
+        click.echo("  Device changes:")
+        for dc in result.device_changes:
+            click.echo(f"    ~ [{dc.track_id}] {dc.track_name}")
+            for dev in dc.added:
+                label = _device_label(dev)
+                click.echo(f"        + \"{label}\"")
+            for dev in dc.removed:
+                label = _device_label(dev)
+                click.echo(f"        - \"{label}\"")
+            if dc.order_changed:
+                click.echo("        ~ device order changed")
 
 
 @cli.command()

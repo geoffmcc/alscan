@@ -857,3 +857,456 @@ def test_diff_locator_has_changes():
     snap_b = build_snapshot(proj)
     result = diff_snapshots(snap_a, snap_b)
     assert not result.has_changes
+
+
+# ---------------------------------------------------------------------------
+# Volume parsing tests
+# ---------------------------------------------------------------------------
+
+_VOLUME_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<Ableton MajorVersion="12" MinorVersion="1" Creator="Ableton Live 12">
+  <LiveSet>
+    <Tempo><Manual Value="120"/></Tempo>
+    <TimeSignature><TimeSignatures><RemoteableTimeSignature><Numerator Value="4"/><Denominator Value="4"/></RemoteableTimeSignature></TimeSignatures></TimeSignature>
+    <Locators><Locators/></Locators>
+    <Tracks>
+      <AudioTrack Id="0">
+        <Name><EffectiveName Value="Test Track"/></Name>
+        <ColorIndex Value="1"/>
+        <DeviceChain>
+          <Mixer>
+            <Volume>
+              <Manual Value="{}"/>
+            </Volume>
+          </Mixer>
+          <Devices/>
+          <MainSequencer><ClipSlotList/></MainSequencer>
+        </DeviceChain>
+      </AudioTrack>
+    </Tracks>
+  </LiveSet>
+</Ableton>"""
+
+
+def _vers_xml(*, volume: float = 0.75, group_id: int = -1,
+              color_index: int = 1, device_xml: str = "") -> str:
+    group_el = f'    <TrackGroupId Value="{group_id}"/>\n' if group_id >= 0 else ""
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<Ableton MajorVersion="12" MinorVersion="1" Creator="Ableton Live 12">
+  <LiveSet>
+    <Tempo><Manual Value="120"/></Tempo>
+    <TimeSignature><TimeSignatures><RemoteableTimeSignature><Numerator Value="4"/><Denominator Value="4"/></RemoteableTimeSignature></TimeSignatures></TimeSignature>
+    <Locators><Locators/></Locators>
+    <Tracks>
+      <AudioTrack Id="0">
+        <Name><EffectiveName Value="Test"/></Name>
+        <ColorIndex Value="{color_index}"/>
+{group_el}        <DeviceChain>
+          <Mixer>
+            <Volume>
+              <Manual Value="{volume}"/>
+            </Volume>
+          </Mixer>
+          <Devices>
+{device_xml}          </Devices>
+          <MainSequencer><ClipSlotList/></MainSequencer>
+        </DeviceChain>
+      </AudioTrack>
+    </Tracks>
+  </LiveSet>
+</Ableton>"""
+
+
+def _device_xml(tag: str) -> str:
+    return f"            <{tag}/>\n"
+
+
+def _plugin_xml(name: str, ptype: str = "vst2", uid: str = "12345") -> str:
+    if ptype == "vst2":
+        return f"""            <PluginDevice>
+              <PluginDesc>
+                <VstPluginInfo>
+                  <Name Value="{name}"/>
+                  <Path Value="/tmp/{name}.dll"/>
+                  <UniqueId Value="{uid}"/>
+                </VstPluginInfo>
+              </PluginDesc>
+            </PluginDevice>\n"""
+    elif ptype == "vst3":
+        return f"""            <PluginDevice>
+              <PluginDesc>
+                <Vst3PluginInfo>
+                  <Name Value="{name}"/>
+                  <Path Value="/tmp/{name}.vst3"/>
+                  <PluginId Value="{uid}"/>
+                </Vst3PluginInfo>
+              </PluginDesc>
+            </PluginDevice>\n"""
+    elif ptype == "au":
+        return f"""            <PluginDevice>
+              <PluginDesc>
+                <AuPluginInfo>
+                  <Name Value="{name}"/>
+                  <Path Value="/tmp/{name}.component"/>
+                  <Manufacturer Value="TestMfr"/>
+                </AuPluginInfo>
+              </PluginDesc>
+            </PluginDevice>\n"""
+    raise ValueError(f"Unknown plugin type: {ptype}")
+
+
+def test_volume_parsed():
+    from alscan.parser import parse_xml_string
+    proj = parse_xml_string(_VOLUME_XML.format("0.85"))
+    assert proj.tracks[0].volume == 0.85
+
+
+def test_volume_absent_defaults():
+    from alscan.parser import parse_xml_string
+    xml = _VOLUME_XML.format("0.75").replace("<Mixer>", "<NoMixer>").replace("</Mixer>", "</NoMixer>")
+    proj = parse_xml_string(xml)
+    assert proj.tracks[0].volume == 1.0
+
+
+def test_volume_malformed_nan():
+    from alscan.parser import parse_xml_string
+    proj = parse_xml_string(_VOLUME_XML.format("NaN"))
+    assert proj.tracks[0].volume == 1.0
+
+
+def test_volume_malformed_inf():
+    from alscan.parser import parse_xml_string
+    proj = parse_xml_string(_VOLUME_XML.format("Infinity"))
+    assert proj.tracks[0].volume == 1.0
+
+
+def test_volume_malformed_neg_inf():
+    from alscan.parser import parse_xml_string
+    proj = parse_xml_string(_VOLUME_XML.format("-Infinity"))
+    assert proj.tracks[0].volume == 1.0
+
+
+def test_volume_malformed_non_numeric():
+    from alscan.parser import parse_xml_string
+    proj = parse_xml_string(_VOLUME_XML.format("not-a-number"))
+    assert proj.tracks[0].volume == 1.0
+
+
+def test_volume_malformed_empty_attr():
+    from alscan.parser import parse_xml_string
+    xml = _VOLUME_XML.format("0.75").replace('Value="0.75"', 'Value=""')
+    proj = parse_xml_string(xml)
+    assert proj.tracks[0].volume == 1.0
+
+
+# ---------------------------------------------------------------------------
+# Expanded diff tests — volume, group, colour, devices
+# ---------------------------------------------------------------------------
+
+
+def test_diff_volume_changed():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    xml_a = _vers_xml(volume=0.75)
+    xml_b = _vers_xml(volume=0.85)
+    snap_a = build_snapshot(parse_xml_string(xml_a))
+    snap_b = build_snapshot(parse_xml_string(xml_b))
+    result = diff_snapshots(snap_a, snap_b)
+    assert result.has_changes
+    assert any("volume" in d for tc in result.track_changes for d in tc.details)
+
+
+def test_diff_volume_tolerance():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    xml_a = _vers_xml(volume=0.75)
+    xml_b = _vers_xml(volume=0.7500005)
+    snap_a = build_snapshot(parse_xml_string(xml_a))
+    snap_b = build_snapshot(parse_xml_string(xml_b))
+    result = diff_snapshots(snap_a, snap_b)
+    assert not result.has_changes
+
+
+def test_diff_group_id_changed():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    xml_a = _vers_xml(group_id=-1)
+    xml_b = _vers_xml(group_id=3)
+    snap_a = build_snapshot(parse_xml_string(xml_a))
+    snap_b = build_snapshot(parse_xml_string(xml_b))
+    result = diff_snapshots(snap_a, snap_b)
+    assert result.has_changes
+    assert any("group_id" in d for tc in result.track_changes for d in tc.details)
+
+
+def test_diff_color_index_changed():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    xml_a = _vers_xml(color_index=1)
+    xml_b = _vers_xml(color_index=5)
+    snap_a = build_snapshot(parse_xml_string(xml_a))
+    snap_b = build_snapshot(parse_xml_string(xml_b))
+    result = diff_snapshots(snap_a, snap_b)
+    assert result.has_changes
+    assert any("color" in d for tc in result.track_changes for d in tc.details)
+
+
+def test_diff_device_added():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    xml_a = _vers_xml(device_xml=_device_xml("Eq8"))
+    xml_b = _vers_xml(device_xml=_device_xml("Eq8") + _device_xml("Compressor2"))
+    snap_a = build_snapshot(parse_xml_string(xml_a))
+    snap_b = build_snapshot(parse_xml_string(xml_b))
+    result = diff_snapshots(snap_a, snap_b)
+    assert len(result.device_changes) == 1
+    dc = result.device_changes[0]
+    assert len(dc.added) == 1
+    assert dc.added[0]["name"] == "Compressor2"
+    assert not dc.removed
+    assert not dc.order_changed
+
+
+def test_diff_device_removed():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    xml_a = _vers_xml(device_xml=_device_xml("Eq8") + _device_xml("Compressor2"))
+    xml_b = _vers_xml(device_xml=_device_xml("Eq8"))
+    snap_a = build_snapshot(parse_xml_string(xml_a))
+    snap_b = build_snapshot(parse_xml_string(xml_b))
+    result = diff_snapshots(snap_a, snap_b)
+    assert len(result.device_changes) == 1
+    dc = result.device_changes[0]
+    assert len(dc.removed) == 1
+    assert dc.removed[0]["name"] == "Compressor2"
+    assert not dc.added
+    assert not dc.order_changed
+
+
+def test_diff_device_order_changed():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    xml_a = _vers_xml(device_xml=_device_xml("Eq8") + _device_xml("Compressor2"))
+    xml_b = _vers_xml(device_xml=_device_xml("Compressor2") + _device_xml("Eq8"))
+    snap_a = build_snapshot(parse_xml_string(xml_a))
+    snap_b = build_snapshot(parse_xml_string(xml_b))
+    result = diff_snapshots(snap_a, snap_b)
+    assert len(result.device_changes) == 1
+    dc = result.device_changes[0]
+    assert dc.order_changed
+    assert not dc.added
+    assert not dc.removed
+
+
+def test_diff_same_device_count_different_devices():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    xml_a = _vers_xml(device_xml=_device_xml("Eq8") + _device_xml("Compressor2"))
+    xml_b = _vers_xml(device_xml=_device_xml("Reverb") + _device_xml("Delay"))
+    snap_a = build_snapshot(parse_xml_string(xml_a))
+    snap_b = build_snapshot(parse_xml_string(xml_b))
+    result = diff_snapshots(snap_a, snap_b)
+    assert len(result.device_changes) == 1
+    dc = result.device_changes[0]
+    assert len(dc.added) == 2
+    assert len(dc.removed) == 2
+    assert not dc.order_changed
+
+
+def test_diff_devices_unchanged():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    xml = _vers_xml(device_xml=_device_xml("Eq8") + _device_xml("Compressor2"))
+    snap = build_snapshot(parse_xml_string(xml))
+    result = diff_snapshots(snap, snap)
+    assert not result.device_changes
+
+
+def test_diff_plugin_device_added():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    xml_a = _vers_xml(device_xml=_plugin_xml("Serum"))
+    xml_b = _vers_xml(device_xml=_plugin_xml("Serum") + _plugin_xml("Ozone"))
+    snap_a = build_snapshot(parse_xml_string(xml_a))
+    snap_b = build_snapshot(parse_xml_string(xml_b))
+    result = diff_snapshots(snap_a, snap_b)
+    assert len(result.device_changes) == 1
+    dc = result.device_changes[0]
+    assert len(dc.added) == 1
+    assert dc.added[0]["name"] == "Ozone"
+    assert dc.added[0]["plugin_type"] == "vst2"
+
+
+def test_diff_duplicate_device_one_removed():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    both = _device_xml("Compressor2") + _device_xml("Compressor2")
+    one = _device_xml("Compressor2")
+    xml_a = _vers_xml(device_xml=both)
+    xml_b = _vers_xml(device_xml=one)
+    snap_a = build_snapshot(parse_xml_string(xml_a))
+    snap_b = build_snapshot(parse_xml_string(xml_b))
+    result = diff_snapshots(snap_a, snap_b)
+    assert len(result.device_changes) == 1
+    dc = result.device_changes[0]
+    assert len(dc.removed) == 1
+    assert dc.removed[0]["name"] == "Compressor2"
+    assert not dc.added
+
+
+def test_diff_duplicate_device_added_third():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    both = _device_xml("Compressor2") + _device_xml("Compressor2")
+    three = both + _device_xml("Compressor2")
+    xml_a = _vers_xml(device_xml=both)
+    xml_b = _vers_xml(device_xml=three)
+    snap_a = build_snapshot(parse_xml_string(xml_a))
+    snap_b = build_snapshot(parse_xml_string(xml_b))
+    result = diff_snapshots(snap_a, snap_b)
+    assert len(result.device_changes) == 1
+    dc = result.device_changes[0]
+    assert len(dc.added) == 1
+    assert dc.added[0]["name"] == "Compressor2"
+    assert not dc.removed
+
+
+def test_diff_duplicate_devices_reordered():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    xml_a = _vers_xml(device_xml=_device_xml("Eq8") + _device_xml("Compressor2") + _device_xml("Compressor2"))
+    xml_b = _vers_xml(device_xml=_device_xml("Compressor2") + _device_xml("Eq8") + _device_xml("Compressor2"))
+    snap_a = build_snapshot(parse_xml_string(xml_a))
+    snap_b = build_snapshot(parse_xml_string(xml_b))
+    result = diff_snapshots(snap_a, snap_b)
+    assert len(result.device_changes) == 1
+    dc = result.device_changes[0]
+    assert dc.order_changed
+    assert not dc.added
+    assert not dc.removed
+
+
+def test_diff_duplicate_chains_identical():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    both = _device_xml("Compressor2") + _device_xml("Compressor2")
+    xml = _vers_xml(device_xml=both)
+    snap = build_snapshot(parse_xml_string(xml))
+    result = diff_snapshots(snap, snap)
+    assert not result.device_changes
+
+
+def test_diff_duplicate_plugin_instances():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    both = _plugin_xml("Serum") + _plugin_xml("Serum")
+    one = _plugin_xml("Serum")
+    snap_a = build_snapshot(parse_xml_string(_vers_xml(device_xml=both)))
+    snap_b = build_snapshot(parse_xml_string(_vers_xml(device_xml=one)))
+    result = diff_snapshots(snap_a, snap_b)
+    assert len(result.device_changes) == 1
+    dc = result.device_changes[0]
+    assert len(dc.removed) == 1
+    assert dc.removed[0]["name"] == "Serum"
+    assert dc.removed[0]["plugin_type"] == "vst2"
+    assert not dc.added
+
+
+def test_diff_vst2_vs_vst3_same_name():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    vst2 = _plugin_xml("Serum", ptype="vst2")
+    vst3 = _plugin_xml("Serum", ptype="vst3")
+    snap_a = build_snapshot(parse_xml_string(_vers_xml(device_xml=vst2)))
+    snap_b = build_snapshot(parse_xml_string(_vers_xml(device_xml=vst3)))
+    result = diff_snapshots(snap_a, snap_b)
+    assert len(result.device_changes) == 1
+    dc = result.device_changes[0]
+    assert len(dc.removed) == 1
+    assert dc.removed[0]["plugin_type"] == "vst2"
+    assert len(dc.added) == 1
+    assert dc.added[0]["plugin_type"] == "vst3"
+
+
+def test_diff_builtin_vs_plugin_same_name():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    builtin = _device_xml("Compressor2")
+    plugin = _plugin_xml("Compressor2")
+    snap_a = build_snapshot(parse_xml_string(_vers_xml(device_xml=builtin)))
+    snap_b = build_snapshot(parse_xml_string(_vers_xml(device_xml=plugin)))
+    result = diff_snapshots(snap_a, snap_b)
+    assert len(result.device_changes) == 1
+    dc = result.device_changes[0]
+    assert len(dc.removed) == 1
+    assert dc.removed[0]["device_type"] == "Compressor2"
+    assert len(dc.added) == 1
+    assert dc.added[0]["device_type"] == "plugin"
+
+
+def test_diff_plugin_renamed():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    old = _plugin_xml("OldName", ptype="vst2")
+    new = _plugin_xml("NewName", ptype="vst2")
+    snap_a = build_snapshot(parse_xml_string(_vers_xml(device_xml=old)))
+    snap_b = build_snapshot(parse_xml_string(_vers_xml(device_xml=new)))
+    result = diff_snapshots(snap_a, snap_b)
+    assert len(result.device_changes) == 1
+    dc = result.device_changes[0]
+    assert len(dc.removed) == 1
+    assert dc.removed[0]["name"] == "OldName"
+    assert len(dc.added) == 1
+    assert dc.added[0]["name"] == "NewName"
+
+
+def test_diff_same_name_different_plugin_type():
+    from alscan.versioner import build_snapshot, diff_snapshots
+    from alscan.parser import parse_xml_string
+    au = _plugin_xml("Effect", ptype="au")
+    vst2 = _plugin_xml("Effect", ptype="vst2")
+    snap_a = build_snapshot(parse_xml_string(_vers_xml(device_xml=au)))
+    snap_b = build_snapshot(parse_xml_string(_vers_xml(device_xml=vst2)))
+    result = diff_snapshots(snap_a, snap_b)
+    assert len(result.device_changes) == 1
+    dc = result.device_changes[0]
+    assert len(dc.removed) == 1
+    assert dc.removed[0]["plugin_type"] == "au"
+    assert len(dc.added) == 1
+    assert dc.added[0]["plugin_type"] == "vst2"
+
+
+def test_diff_real_als_files_preserved():
+    import gzip
+    import hashlib
+    import tempfile
+    from pathlib import Path
+    from alscan.parser import parse_als
+    from alscan.versioner import build_snapshot, diff_snapshots
+    xml_a = _vers_xml(volume=0.75, device_xml=_device_xml("Eq8"))
+    xml_b = _vers_xml(volume=0.85, device_xml=_device_xml("Compressor2"))
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp = Path(tmpdir)
+        als1 = tmp / "project1.als"
+        als2 = tmp / "project2.als"
+        data1 = gzip.compress(xml_a.encode("utf-8"))
+        data2 = gzip.compress(xml_b.encode("utf-8"))
+        als1.write_bytes(data1)
+        als2.write_bytes(data2)
+        hash1 = hashlib.sha256(data1).hexdigest()
+        hash2 = hashlib.sha256(data2).hexdigest()
+        proj1 = parse_als(str(als1))
+        proj2 = parse_als(str(als2))
+        snap1 = build_snapshot(proj1)
+        snap2 = build_snapshot(proj2)
+        result = diff_snapshots(snap1, snap2)
+        # Source files must be byte-for-byte identical
+        assert hashlib.sha256(als1.read_bytes()).hexdigest() == hash1
+        assert hashlib.sha256(als2.read_bytes()).hexdigest() == hash2
+        # No unexpected files beside the source projects
+        expected = {als1, als2}
+        actual = set(tmp.iterdir())
+        extra = actual - expected
+        assert not extra, f"Unexpected files created: {[str(p) for p in extra]}"
+        # Diff must actually detect the changes
+        assert result.has_changes
