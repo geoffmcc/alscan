@@ -524,7 +524,8 @@ def test_cli_as_script_version():
     )
     assert r.returncode == 0
     assert "alscan" in r.stdout
-    assert "0.3.1" in r.stdout
+    from alscan import __version__
+    assert __version__ in r.stdout
 
 
 # -- Report output / atomic write tests --
