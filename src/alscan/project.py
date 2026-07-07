@@ -2,17 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from alscan.io_safety import validate_parent as _validate_parent
+
 _EXCLUDED_DIRS = {"Backup"}
-
-
-def _validate_parent(p: Path) -> None:
-    parts = p.absolute().parts
-    for i in range(1, len(parts)):
-        check = Path(*parts[:i+1])
-        if check.is_symlink() or check.is_junction():
-            raise PermissionError(
-                f"Path component is a symlink or junction; refusing to follow: {check}"
-            )
 
 
 def find_als_file(path: str | Path) -> Path | None:

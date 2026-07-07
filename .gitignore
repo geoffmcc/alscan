@@ -49,3 +49,6 @@ Thumbs.db
 
 # Temp test files
 tests/tmp/
+
+# External package manager lock files
+uv.lock

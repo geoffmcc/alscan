@@ -451,6 +451,16 @@ def test_save_snapshot_is_not_overwritten(tmp_path):
     assert p1.name != p2.name
 
 
+def test_save_snapshot_refuses_existing_path(tmp_path):
+    from alscan.io_safety import atomic_publish
+    p = tmp_path / "target.json"
+    p.write_text("data")
+    tmp = tmp_path / ".tmpfile"
+    tmp.write_text("data2")
+    with pytest.raises(FileExistsError):
+        atomic_publish(tmp, p)
+
+
 def test_find_snapshots_ignores_corrupt_files(tmp_path):
     from alscan.versioner import save_snapshot, find_snapshots
     proj = parse_als(FIXTURES / "clean.als")
