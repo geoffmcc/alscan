@@ -1,0 +1,9 @@
+README.md whitespace=-blank-at-eol,-cr-at-eol
+pyproject.toml whitespace=-blank-at-eol,-cr-at-eol
+src/alscan/cli.py whitespace=-blank-at-eol,-cr-at-eol
+src/alscan/project.py whitespace=-blank-at-eol,-cr-at-eol
+src/alscan/versioner.py whitespace=-blank-at-eol,-cr-at-eol
+tests/test_alscan.py whitespace=-blank-at-eol,-cr-at-eol
+src/alscan/merge/*.py text eol=lf
+tests/test_merge_*.py text eol=lf
+tests/test_io_safety.py text eol=lf

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from alscan.io_safety import atomic_publish
 from alscan.models import Project
 from alscan.parser import parse_als
 
@@ -61,7 +62,7 @@ class Snapshot:
         return sum(t["device_count"] for t in self.tracks)
 
     def to_json(self) -> str:
-        return json.dumps(asdict(self), indent=2, ensure_ascii=False)
+        return json.dumps(asdict(self), indent=2, ensure_ascii=False, allow_nan=False)
 
     @classmethod
     def from_json(cls, data: str) -> Snapshot:
@@ -160,7 +161,7 @@ def save_snapshot(proj: Project, project_dir: Path) -> Path:
         os.fsync(tmp.open("rb").fileno())
     except OSError:
         pass
-    tmp.replace(path)
+    atomic_publish(tmp, path)
     return path
 
 

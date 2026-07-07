@@ -1,17 +1,24 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
-import tempfile
 import time
 from pathlib import Path
 
 import click
 
 from alscan import __version__
+from alscan.io_safety import (
+    ABLETON_CONTENT_EXTENSIONS,
+    atomic_write as _atomic_write_report,
+    validate_output_dest,
+    validate_parent as _validate_parent,
+)
+from alscan.merge.analysis import build_merge_plan
+from alscan.merge.inputs import validate_three_way
+from alscan.merge.report import render_merge_report
 from alscan.parser import parse_als
-from alscan.project import find_als_file, _validate_parent
+from alscan.project import find_als_file
 from alscan.report.terminal import print_terminal_report, print_batch_summary
 from alscan.report.html import generate_html_report
 from alscan.report.json import generate_json_report
@@ -25,62 +32,6 @@ from alscan.versioner import (
     Snapshot,
     SNAPSHOT_FORMAT_VERSION,
 )
-
-ABLETON_CONTENT_EXTENSIONS = {".als", ".wav", ".aiff", ".aif", ".asd", ".adg", ".amxd", ".alp"}
-
-
-def _safe_unlink(path: Path) -> None:
-    try:
-        path.unlink(missing_ok=True)
-    except OSError:
-        pass
-
-
-def _atomic_publish_report(temp_path: Path, dest: Path) -> None:
-    """Publish *temp_path* to *dest* with atomic no-clobber semantics.
-
-    Uses os.link() which creates a hard link at *dest* pointing to the
-    same data as *temp_path* only if *dest* does not already exist.
-    This is a single filesystem call — no TOCTOU race between checking
-    and writing.
-
-    On success  → *dest* contains the data, *temp_path* is unlinked.
-    On failure  → *dest* is untouched, *temp_path* is unlinked.
-    On conflict → FileExistsError is raised (another writer already
-                  published to *dest*), *temp_path* is unlinked.
-
-    os.link() requires both paths on the same volume, which holds here
-    because *temp_path* is created in *dest.parent*.
-    """
-    try:
-        os.link(str(temp_path), str(dest))
-    except FileExistsError:
-        raise
-    finally:
-        _safe_unlink(temp_path)
-
-
-def _atomic_write_report(dest: Path, content: str) -> None:
-    """Write *content* to *dest* with atomic no-clobber publication.
-
-    Creates parent directories if needed, writes to a temporary file in
-    the same directory, flushes and fsyncs, then publishes atomically.
-    """
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_path_str = tempfile.mkstemp(
-        dir=str(dest.parent),
-        prefix=f".{dest.name}.tmp.",
-    )
-    tmp_path = Path(tmp_path_str)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(content)
-            f.flush()
-            os.fsync(f.fileno())
-        _atomic_publish_report(tmp_path, dest)
-    except BaseException:
-        _safe_unlink(tmp_path)
-        raise
 
 
 def _safe_report_output(output_path: str, source_als: Path) -> Path:
@@ -423,3 +374,122 @@ def log(path: str) -> None:
 
     click.echo()
     click.echo(f"  {count} snapshot(s) total")
+
+
+# ---------------------------------------------------------------------------
+# Merge commands (v0.4)
+# ---------------------------------------------------------------------------
+
+
+@cli.command(name="merge-plan")
+@click.argument("base", type=str, required=True)
+@click.argument("ours", type=str, required=True)
+@click.argument("theirs", type=str, required=True)
+@click.option("--output", "-O", type=str, default="", help="Write merge plan to file")
+@click.option("--allow-unrelated", is_flag=True, default=False,
+              help="Allow analysis of structurally unrelated projects")
+def merge_plan_command(base: str, ours: str, theirs: str,
+                       output: str, allow_unrelated: bool) -> None:
+    """Analyze three project versions and produce a merge plan.
+
+    BASE, OURS, and THEIRS must be paths to .als files or alscan
+    snapshot .json files. All three must be the same type.
+
+    The merge plan describes structural differences across the three
+    versions, including auto-resolved changes and conflicts. No merged
+    .als file is generated.
+
+    This command does not modify any input file.
+    """
+    try:
+        inputs = validate_three_way(base, ours, theirs,
+                                    allow_unrelated=allow_unrelated)
+    except (FileNotFoundError, ValueError) as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+    plan = build_merge_plan(inputs)
+
+    json_str = plan.to_json()
+
+    if output:
+        dest = Path(output)
+        try:
+            validate_output_dest(
+                dest,
+                [Path(base), Path(ours), Path(theirs)],
+                reject_ableton_exts=True,
+                reject_backup=True,
+                reject_alscan=True,
+            )
+        except (ValueError, FileExistsError) as e:
+            click.echo(f"Error: {e}", err=True)
+            sys.exit(1)
+        try:
+            _atomic_write_report(dest, json_str)
+        except OSError as e:
+            click.echo(
+                f"Error: could not write merge plan to {dest} — {e}",
+                err=True,
+            )
+            sys.exit(1)
+        click.echo(f"Merge plan written to: {dest}", err=True)
+    else:
+        click.echo(json_str)
+
+    if plan.conflict_count > 0:
+        sys.exit(3)
+
+
+@cli.command(name="merge-report")
+@click.argument("base", type=str, required=True)
+@click.argument("ours", type=str, required=True)
+@click.argument("theirs", type=str, required=True)
+@click.option("--output", "-O", type=str, required=True, help="Write HTML merge report to file")
+@click.option("--allow-unrelated", is_flag=True, default=False,
+              help="Allow analysis of structurally unrelated projects")
+def merge_report_command(base: str, ours: str, theirs: str,
+                         output: str, allow_unrelated: bool) -> None:
+    """Analyze three versions and render an HTML conflict report.
+
+    BASE, OURS, and THEIRS must be paths to .als files or alscan
+    snapshot .json files. All three must be the same type.
+
+    The report is rendered entirely from the MergePlan v2 document model.
+    It does not create merged metadata, modify .als files, apply changes,
+    or reconstruct Ableton projects.
+    """
+    try:
+        inputs = validate_three_way(base, ours, theirs,
+                                    allow_unrelated=allow_unrelated)
+    except (FileNotFoundError, ValueError) as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+    plan = build_merge_plan(inputs)
+    html = render_merge_report(plan)
+
+    dest = Path(output)
+    try:
+        validate_output_dest(
+            dest,
+            [Path(base), Path(ours), Path(theirs)],
+            reject_ableton_exts=True,
+            reject_backup=True,
+            reject_alscan=True,
+        )
+    except (ValueError, FileExistsError) as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+    try:
+        _atomic_write_report(dest, html)
+    except OSError as e:
+        click.echo(
+            f"Error: could not write merge report to {dest} — {e}",
+            err=True,
+        )
+        sys.exit(1)
+    click.echo(f"Merge report written to: {dest}", err=True)
+
+    if plan.conflict_count > 0:
+        sys.exit(3)

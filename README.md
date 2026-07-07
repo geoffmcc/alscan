@@ -1,57 +1,91 @@
 # alscan
 
-**Ableton Live Project Health Scanner** — analyze, version, and merge `.als` project files from the command line.
+**Ableton Live Project Health Scanner** — analyze, version, and compare `.als` project files from the command line.
+
+## Installation
+
+### Prebuilt binaries (recommended)
+
+Download the latest release for your platform from the [Releases page](https://github.com/geoffmcc/alscan/releases):
+
+| Platform | Download |
+|----------|----------|
+| Windows  | `alscan-x.x.x.exe` |
+| macOS    | `alscan-x.x.x.dmg` |
+
+These are standalone, self-contained builds — no Python or other dependencies required. Simply download and run.
+
+### From source (developers)
 
 ```bash
-pip install alscan
-alscan scan "My Song/"
+git clone https://github.com/geoffmcc/alscan
+cd alscan
+pip install -e ".[dev]"
+
+# Verify
+alscan --version
+alscan --help
 ```
 
-## Features
+To build a wheel without the source link:
 
-- **Structural change tracking** — snapshot project structure, diff across versions, view change history
-- **19 health checks** — missing samples, broken plugins, frozen tracks, CPU-heavy plugins, duplicate samples, empty groups, warped clips, master chain plugins, and more
-- **Rich terminal output** — color-coded findings grouped by severity (error/warning/info)
-- **HTML report** — dark-themed static report with summary cards and track listing
-- **JSON output** — machine-readable output with `--format json`
-- **Exit codes** — `--exit-code` flag exits with code 1 when errors are found
-- **Cross-platform** — Windows, macOS, Linux
-- **Batch scanning** — scan all projects under a directory with `--recursive`
-- **Extensible** — add custom checks with the `@register` decorator
+```bash
+pip install build
+python -m build --wheel
+pip install dist\alscan-*.whl        # Windows
+pip install dist/alscan-*.whl         # macOS / Linux
+```
 
 ## Quick Start
 
 ```bash
-# Scan a single project directory
-alscan scan "~/Ableton Projects/My Song Project/"
+# Install (see installation above), then:
+alscan --help
 
-# Generate an HTML report
-alscan scan "~/Ableton Projects/My Song Project/" --format html
+# Scan a project for issues
+alscan scan "~/Ableton Projects/My Song/"
 
-# Open the report in your browser
-alscan scan "~/Ableton Projects/My Song Project/" --format html --browser
+# Generate an HTML health report
+alscan scan "~/Ableton Projects/My Song/" --format html --browser
 
-# Scan all projects under a folder
-alscan scan "~/Ableton Projects/" --recursive
+# Capture a structural snapshot
+alscan snapshot "~/Ableton Projects/My Song/"
 
-> **Note**: `--output` is not supported with `--recursive`. Each project's report is printed to stdout only.
-
-# List all available checks
-alscan list-checks
-
-# Capture a project snapshot
-alscan snapshot "~/Ableton Projects/My Song Project/"
-
-# Compare two .als project files
+# Compare two project versions
 alscan diff "My Song.als" "My Song Backups/v2.als"
 
-# View snapshot history
-alscan log "My Song Project/"
+# Experimental: three-way structural conflict report
+alscan merge-report base.als ours.als theirs.als --output report.html
 ```
 
-> **Troubleshooting**: If `alscan scan <directory>` says "Multiple .als files found", the directory contains more than one project. Pass the explicit path to the `.als` file instead: `alscan scan "~/Ableton Projects/My Song/My Song.als"`.
+## Features
 
-## Output Example
+| Area | What it does |
+|------|-------------|
+| **Health scanning** | 19 checks: missing samples, broken plugins, frozen tracks, CPU-heavy plugins, duplicate samples, empty groups, warped clips, master chain plugins, and more |
+| **Versioning** | Capture structural snapshots, diff across versions, view change history |
+| **Conflict analysis** | Experimental three-way structural merge analysis with offline HTML reporting |
+| **Rich terminal output** | Color-coded findings grouped by severity (error / warning / info) |
+| **HTML reports** | Dark-themed static health report with summary cards and track listing |
+| **JSON output** | Machine-readable output with `--format json` |
+| **Exit codes** | `--exit-code` flag exits with code 1 when errors are found; merge-report uses 0/2/3/1 |
+| **Batch scanning** | Scan all projects under a directory with `--recursive` |
+| **Cross-platform** | Windows, macOS, Linux |
+
+## Commands
+
+| Command | Description | Status |
+|---------|-------------|--------|
+| `scan` | Run health checks on a project directory or `.als` file | Stable |
+| `list-checks` | List all available health checks | Stable |
+| `snapshot` | Save a structural metadata snapshot of a project | Stable |
+| `diff` | Compare two `.als` files or snapshots | Stable |
+| `log` | View snapshot history for a project | Stable |
+| `merge-report` | Experimental three-way structural conflict analysis | Experimental |
+
+## Output Examples
+
+### Terminal (default)
 
 ```
 alscan v0.3.0 — Scan Report
@@ -81,7 +115,24 @@ Creator: Ableton Live 12.4.2 · 120.0 BPM
     → Unfreeze to verify plugins are available
 ```
 
-## Checks
+### JSON
+
+```bash
+alscan scan "My Song/" --format json --pretty --output report.json
+```
+
+Includes project metadata, track counts, and all findings with severity, check name, message, location, and suggestion.
+
+### HTML Health Report
+
+```bash
+alscan scan "My Song/" --format html --browser
+# → Writes alscan-report.html and opens it in your browser
+```
+
+Dark-themed static report with summary cards (error/warning/info counts), severity badges, project stats, and track listing table.
+
+## Health Checks
 
 | Check | Severity | Description |
 |-------|----------|-------------|
@@ -105,63 +156,86 @@ Creator: Ableton Live 12.4.2 · 120.0 BPM
 | `extreme_tempo` | info | Project tempo outside 40–200 BPM range |
 | `no_locators` | info | Project has no locators/markers |
 
-## HTML Report
+## Versioning (snapshot / diff / log)
 
-Use `--format html --browser` to generate a dark-themed static HTML report in the project directory:
-
-```
-alscan scan "My Song/" --format html --browser
-# → Writes alscan-report.html and opens it in your browser
-```
-
-The report shows summary cards (errors/warnings/info counts), all findings with severity badges, a project stats grid, and a full track listing table.
-
-## JSON Output
-
-Use `--format json` for machine-readable output:
+Capture structural metadata snapshots of your projects and compare them over time.
 
 ```bash
-alscan scan "My Song/" --format json
-```
-
-Combine with `--pretty` (default: on), `--exit-code`, and `--output`:
-
-```bash
-alscan scan "My Song/" --format json --output report.json --exit-code
-echo $?  # 0 if no errors, 1 if errors found
-```
-
-The JSON includes project metadata, track counts, and all findings with severity, check name, message, location, and suggestion.
-
-## Versioning
-
-Track your project's evolution with snapshot, diff, and log commands.
-
-> **Note**: The `snapshot` command creates an `.alscan/snapshots/` directory in the project folder. This directory is excluded from Git via `.gitignore`.
-
-```bash
-# Save a structural snapshot of the project
+# Save a snapshot
 alscan snapshot "My Song/"
 # → Writes .alscan/snapshots/My Song-<timestamp>-<uuid>.json
 
-# Compare two .als project files
+# Compare two files or snapshots
 alscan diff "My Song.als" "My Song Backups/v2.als"
-
-# Compare a project against a previous snapshot
-alscan diff "My Song.als" "My Song/.alscan/snapshots/My Song-20260706-abc123.json"
-
-# Compare two snapshots
+alscan diff "My Song.als" "My Song/.alscan/snapshots/v1.json"
 alscan diff "My Song/.alscan/snapshots/v1.json" "My Song/.alscan/snapshots/v2.json"
-
-# → Shows: tempo, time signature, locator, track, device, and clip count changes
-#   (structural metadata only — not a complete Ableton project comparison)
 
 # View snapshot history
 alscan log "My Song/"
-# → Lists all snapshots with timestamps, BPM, track/device counts
 ```
 
-Snapshots capture **structural metadata only**: project tempo/time sig/creator, track list with device/clip counts, plugin references, and a structural fingerprint (not audio content). The `Backup/` folder is excluded from recursive scanning.
+> Snapshots capture **structural metadata only**: tempo, time signature, creator string, track list with device/clip counts, plugin references, and a structural fingerprint. No audio content.
+
+> The `.alscan/snapshots/` directory is excluded from Git via `.gitignore`. The `Backup/` folder is excluded from recursive scanning.
+
+### What `diff` shows
+
+Tempo, time signature, locator, track, device, and clip count changes — structural metadata only, not a complete Ableton project comparison.
+
+## Merge Conflict Report (experimental)
+
+> ⚠️ **Experimental.** This command analyzes structural differences but does not apply merges, write `.als` files, produce XML, or reconstruct projects.
+
+```bash
+alscan merge-report BASE OURS THEIRS --output report.html
+```
+
+`BASE`, `OURS`, and `THEIRS` may be `.als` files or alscan snapshot `.json` files — all three must be the same type.
+
+### What it produces
+
+An offline HTML report rendered from the MergePlan v2 document model:
+
+- Source file labels and SHA-256 hashes
+- Identity matches across all three versions
+- Structural conflicts and auto-resolved changes
+- Track-level changes (added, removed, modified, positional)
+- Locator additions and removals
+- Proposed track order
+- Scope of analyzed fields
+
+The report uses inline CSS only, no external network resources, and is safe for offline viewing.
+
+### Privacy
+
+Source file paths are reduced to basenames. Plugin-state data is redacted.
+
+### Exit codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | No conflicts found (report still written) |
+| `2` | `--output` not provided |
+| `3` | Conflicts detected (report written) |
+| `1` | Validation failure or I/O error |
+
+### What it does NOT do
+
+Create merged metadata, modify `.als` files, write XML, apply conflicts, interpret plugin state, or reconstruct Ableton projects.
+
+## Platform Compatibility
+
+| OS | Status |
+|----|--------|
+| Windows | Tested via WSL; Python 3.14+ |
+| macOS | Manual testing needed |
+| Linux | CI-tested; Ableton does not run here |
+
+**Known limitations**:
+- Atomic file operations (`os.link`) require both paths on the same filesystem volume
+- Network filesystems (NFS, SMB) may not guarantee atomic no-clobber writes
+- Long paths (>260 chars) on Windows are not handled — use Python 3.12+ or short paths
+- `Path.is_junction()` (Windows) requires Python 3.12
 
 ## Privacy & Security
 
@@ -171,21 +245,7 @@ Reports and snapshots contain metadata that may include sensitive information:
 - **Track names** may reflect unreleased song titles, client names, or working titles
 - **Creator field** shows the Ableton Live registration name
 
-Review reports before sharing them.  Snapshots are stored locally in `.alscan/` and are excluded from Git via `.gitignore`.
-
-## Platform Compatibility
-
-| OS         | Status                                       |
-|------------|----------------------------------------------|
-| Windows    | Tested via WSL; native PyInstaller builds    |
-| macOS      | PyInstaller builds; manual testing needed    |
-| Linux      | Supported for CI; Ableton does not run here  |
-
-**Known limitations**:
-- Atomic file operations (`os.link`) require both paths on the same filesystem volume
-- Network filesystems (NFS, SMB) may not guarantee atomic no-clobber writes
-- Long paths (>260 chars) on Windows are not handled — use Python 3.12+ or short paths
-- `Path.is_junction()` (Windows) requires Python 3.12
+Review reports before sharing them. Merge reports also show source labels, hashes, and structural change details. Snapshots are stored locally in `.alscan/` and excluded from Git via `.gitignore`.
 
 ## Uninstall
 
@@ -198,7 +258,6 @@ If you used a standalone PyInstaller build (macOS `.dmg` or Windows `.exe`), sim
 ## Development
 
 ```bash
-# Clone and install in editable mode
 git clone https://github.com/geoffmcc/alscan
 cd alscan
 pip install -e ".[dev]"
@@ -208,14 +267,17 @@ pytest
 
 # Regenerate test fixtures
 python -m tests.fixtures.generate
+
+# Build
+python -m build
 ```
 
 ## Roadmap
 
 - **v0.1** ✅ Project health scanning
 - **v0.2** ✅ Extended checks, JSON output, exit codes
-- **v0.3** ✅ Project versioning (snapshot / diff / log) — [pending release](https://github.com/geoffmcc/alscan/pull/2)
-- **v0.4** — Project merging (three-way merge)
+- **v0.3** ✅ Project versioning (snapshot / diff / log) — development
+- **v0.4** ✅ Experimental three-way structural analysis and offline conflict reporting — development
 
 ## License
 
