@@ -81,6 +81,8 @@ def _parse_tempo(live_set, proj):
     tempo_el = live_set.find("Tempo")
     if tempo_el is None:
         tempo_el = live_set.find("MainTrack/DeviceChain/Mixer/Tempo")
+    if tempo_el is None:
+        tempo_el = live_set.find("MasterTrack/MasterChain/Mixer/Tempo")
     if tempo_el is not None:
         manual = tempo_el.find("Manual")
         if manual is not None:
@@ -88,6 +90,13 @@ def _parse_tempo(live_set, proj):
                 proj.tempo = float(manual.get("Value", 120))
             except (ValueError, TypeError):
                 pass
+        else:
+            fe = tempo_el.find("ArrangerAutomation/Events/FloatEvent")
+            if fe is not None:
+                try:
+                    proj.tempo = float(fe.get("Value", 120))
+                except (ValueError, TypeError):
+                    pass
 
 
 def _parse_time_signature(live_set, proj):
