@@ -312,11 +312,11 @@ def test_shared_atomic_publication_is_no_clobber_and_cleans_temps(tmp_path):
 
 
 def test_readme_merge_report_wording_is_read_only():
-    text = Path("README.md").read_text()
-    assert "Generate an offline HTML report from experimental three-way structural analysis." in text
-    assert "does **not** create merged metadata" in text
+    text = Path("README.md").read_text(encoding="utf-8")
+    assert "An offline HTML report rendered from the MergePlan v2 document model" in text
+    assert "does not apply merges" in text
     assert "modify `.als` files" in text
-    assert "Without `--output`, the HTML is printed to stdout" not in text
+    assert "--output" in text
 
 
 def _valid_plan_dict() -> dict:
