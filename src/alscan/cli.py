@@ -302,8 +302,9 @@ def snapshot(path: str) -> None:
 
 @cli.command()
 @click.argument("path_a", type=str, required=True)
-@click.argument("path_b", type=str, required=True)
-def diff(path_a: str, path_b: str) -> None:
+@click.argument("path_b", type=str, required=False, default=None)
+@click.option("--snapshot", type=int, default=None, help="Index of snapshot to diff against (use 'log' to list)")
+def diff(path_a: str, path_b: str | None, snapshot: int | None) -> None:
     """Compare two projects or snapshots.
 
     Compares structural metadata (tempo, time signature, locators,
@@ -313,8 +314,27 @@ def diff(path_a: str, path_b: str) -> None:
 
     Arguments may be paths to .als files or snapshot .json files.
     """
+    if path_b is None and snapshot is None:
+        click.echo("Error: provide PATH_B or use --snapshot.", err=True)
+        sys.exit(1)
+
     snap_a = _load_any(path_a)
-    snap_b = _load_any(path_b)
+
+    if snapshot is not None:
+        als_file = _resolve_als(path_a)
+        snaps = find_snapshots(als_file.parent)
+        if not snaps:
+            click.echo(f"No snapshots found for {als_file.parent.name}", err=True)
+            sys.exit(1)
+        if snapshot < 1 or snapshot > len(snaps):
+            click.echo(
+                f"Snapshot index {snapshot} out of range (1-{len(snaps)})",
+                err=True,
+            )
+            sys.exit(1)
+        snap_b = load_snapshot(snaps[snapshot - 1])
+    else:
+        snap_b = _load_any(path_b)
     result = diff_snapshots(snap_a, snap_b)
 
     if not result.has_changes:
