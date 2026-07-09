@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from alscan.checks import Finding, register
+from alscan.config import CheckConfig
 from alscan.models import Project
 
 
@@ -42,9 +43,10 @@ def check_master_chain_plugins(project: Project) -> list[Finding]:
 
 
 @register("extreme_tempo", severity="info", description="Project tempo outside 40-200 BPM range")
-def check_extreme_tempo(project: Project) -> list[Finding]:
+def check_extreme_tempo(project: Project, config: CheckConfig | None = None) -> list[Finding]:
+    cfg = config if config else CheckConfig.defaults()
     findings = []
-    if project.tempo < 40:
+    if project.tempo < cfg.extreme_tempo_low:
         findings.append(Finding(
             severity="info",
             check_name="extreme_tempo",
@@ -53,7 +55,7 @@ def check_extreme_tempo(project: Project) -> list[Finding]:
             location="Project settings",
             suggestion="Verify the tempo is intentional. Extremely low tempos can affect plugin behavior and timing",
         ))
-    elif project.tempo > 200:
+    elif project.tempo > cfg.extreme_tempo_high:
         findings.append(Finding(
             severity="info",
             check_name="extreme_tempo",
@@ -66,9 +68,10 @@ def check_extreme_tempo(project: Project) -> list[Finding]:
 
 
 @register("no_locators", severity="info", description="Project has no locators/markers")
-def check_no_locators(project: Project) -> list[Finding]:
+def check_no_locators(project: Project, config: CheckConfig | None = None) -> list[Finding]:
+    minimum = config.no_locators_min_tracks if config else CheckConfig.defaults().no_locators_min_tracks
     findings = []
-    if len(project.locators) == 0 and len(project.tracks) > 5:
+    if len(project.locators) == 0 and len(project.tracks) > minimum:
         findings.append(Finding(
             severity="info",
             check_name="no_locators",

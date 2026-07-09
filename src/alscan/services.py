@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import json
 import time
+import inspect
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Literal
 
 from alscan.checks import Check, list_checks as _list_checks
+from alscan.config import CheckConfig
 from alscan.io_safety import (
     atomic_write as _atomic_write_report,
     validate_output_dest,
@@ -40,6 +42,16 @@ CancelledCb = Callable[[], bool]
 """Callback that returns True if the operation should be cancelled."""
 
 
+def _invoke_check(check: Check, project, config: CheckConfig | None):
+    try:
+        sig = inspect.signature(check.func)
+        if "config" in sig.parameters:
+            return check.func(project, config=config)
+    except (ValueError, TypeError):
+        pass
+    return check.func(project)
+
+
 class ScanError(Exception):
     pass
 
@@ -65,6 +77,7 @@ class ScanOptions:
     format: Literal["terminal", "json", "html", "csv"] = "terminal"
     verbose: bool = False
     pretty: bool = True
+    check_config: CheckConfig | None = None
 
 
 @dataclass
@@ -125,11 +138,12 @@ def scan_project(
     from alscan.checks import list_checks
     findings = []
     checks = list_checks()
+    config = options.check_config if options else None
     for i, check in enumerate(checks):
         if cancelled_cb and cancelled_cb():
             raise ScanError("Scan cancelled")
         try:
-            result = check.func(project)
+            result = _invoke_check(check, project, config)
             findings.extend(result)
         except Exception as e:
             findings.append(Finding(

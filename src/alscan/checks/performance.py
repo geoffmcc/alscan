@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from alscan.checks import Finding, register
+from alscan.config import CheckConfig
 from alscan.models import Project
 
 HEAVY_DEVICES = {
@@ -34,10 +35,11 @@ def check_frozen_tracks(project: Project) -> list[Finding]:
 
 
 @register("high_device_count", severity="info", description="Tracks with unusually many devices")
-def check_high_device_count(project: Project) -> list[Finding]:
+def check_high_device_count(project: Project, config: CheckConfig | None = None) -> list[Finding]:
+    limit = config.high_device_count if config else CheckConfig.defaults().high_device_count
     findings = []
     for track in project.tracks:
-        if len(track.devices) > 8:
+        if len(track.devices) > limit:
             findings.append(Finding(
                 severity="info",
                 check_name="high_device_count",
@@ -84,14 +86,17 @@ def check_high_latency_plugins(project: Project) -> list[Finding]:
 
 
 @register("unfrozen_heavy_tracks", severity="info", description="Tracks with many clips and devices that could be frozen")
-def check_unfrozen_heavy_tracks(project: Project) -> list[Finding]:
+def check_unfrozen_heavy_tracks(project: Project, config: CheckConfig | None = None) -> list[Finding]:
+    cfg = config if config else CheckConfig.defaults()
+    clip_limit = cfg.unfrozen_heavy_clips
+    device_limit = cfg.unfrozen_heavy_devices
     findings = []
     for track in project.tracks:
         if track.is_frozen:
             continue
         clip_count = len(track.clips)
         device_count = len(track.devices)
-        if clip_count > 20 and device_count > 3:
+        if clip_count > clip_limit and device_count > device_limit:
             findings.append(Finding(
                 severity="info",
                 check_name="unfrozen_heavy_tracks",
