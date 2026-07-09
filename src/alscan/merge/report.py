@@ -29,6 +29,7 @@ def render_merge_report(plan: MergePlan | dict[str, Any]) -> str:
     locator_changes = _sorted_locator_changes(data.get("locator_changes", []))
     proposed_track_order = _sorted_items(data.get("proposed_track_order", []), "position", "track_id", "name")
     warnings = sorted(str(w) for w in data.get("warnings", []))
+    notices = sorted(str(n) for n in data.get("notices", []))
 
     parts = [
         "<!doctype html>",
@@ -47,6 +48,7 @@ def render_merge_report(plan: MergePlan | dict[str, Any]) -> str:
         _summary(data),
         _sources(data),
         _warnings(warnings),
+        _notices(notices),
         _section("Conflicts requiring review", conflicts, _conflict_card, empty="No conflicts detected."),
         _section("Auto-resolved changes", auto_resolved, _auto_card, empty="No auto-resolved changes."),
         _section("Track changes", track_changes, _track_card, empty="No track changes."),
@@ -95,6 +97,7 @@ def _validate_v2(data: dict[str, Any]) -> None:
         "proposed_track_order": list,
         "file_differences_detected": bool,
         "warnings": list,
+        "notices": list,
     }
     for key, expected in required.items():
         if key not in data:
@@ -106,6 +109,7 @@ def _validate_v2(data: dict[str, Any]) -> None:
     _validate_sources(data["sources"])
     _validate_string_list(data["supported_field_scope"], "supported_field_scope")
     _validate_string_list(data["warnings"], "warnings")
+    _validate_string_list(data["notices"], "notices")
     _validate_records(data["conflicts"], "conflicts", {
         "id": str, "field": str, "reason": str, "risk": str,
         "available_resolutions": list, "auto_blocked": bool,
@@ -235,6 +239,13 @@ def _warnings(warnings: list[str]) -> str:
         return '<section><h2>Warnings</h2><p class="empty">No warnings.</p></section>'
     items = "".join(f"<li>{_h(w)}</li>" for w in warnings)
     return f'<section><h2>Warnings</h2><ul class="warnings">{items}</ul></section>'
+
+
+def _notices(notices: list[str]) -> str:
+    if not notices:
+        return ""
+    items = "".join(f"<li>{_h(n)}</li>" for n in notices)
+    return f'<section class="notices"><h2>Notices</h2><ul>{items}</ul></section>'
 
 
 def _section(title: str, items: list[dict[str, Any]], renderer, empty: str) -> str:

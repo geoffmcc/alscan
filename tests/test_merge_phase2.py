@@ -251,7 +251,8 @@ class TestPhase2TrackChanges:
 class TestPhase2Locators:
     def test_unchanged_locator(self):
         p = plan_for([], [], [], [{"name": "A", "time": 1}], [{"name": "A", "time": 1}], [{"name": "A", "time": 1}])
-        assert any(c.kind == "unchanged" for c in p.locator_changes)
+        assert not p.locator_changes
+        assert not p.conflicts
 
     def test_one_sided_movement(self):
         p = plan_for([], [], [], [{"name": "A", "time": 1}], [{"name": "A", "time": 2}], [{"name": "A", "time": 1}])
@@ -300,18 +301,18 @@ class TestPhase2Locators:
             [{"name": "A", "time": 1}, {"name": "A", "time": 2}, {"name": "A", "time": 3}],
             [{"name": "A", "time": 1}],
         )
-        assert any(c.kind == "unchanged" for c in p.locator_changes)
         assert any(c.field == "locator.identity" for c in p.conflicts)
 
     def test_exact_duplicate_tuples_leave_ambiguity(self):
         locs = [{"name": "A", "time": 1}, {"name": "A", "time": 1}]
         p = plan_for([], [], [], locs, locs, locs)
-        assert len([c for c in p.locator_changes if c.kind == "unchanged"]) == 2
+        assert not p.locator_changes
         assert not p.conflicts
 
     def test_near_equal_locator_time_uses_numeric_policy(self):
         p = plan_for([], [], [], [{"name": "A", "time": 1.0000001}], [{"name": "A", "time": 1.0000002}], [{"name": "A", "time": 1.0000003}])
-        assert any(c.kind == "unchanged" for c in p.locator_changes)
+        assert not p.locator_changes
+        assert not p.conflicts
 
 
 class TestPhase2SafetyCompatibility:
