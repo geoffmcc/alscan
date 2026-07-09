@@ -628,5 +628,51 @@ def merge_report_command(base: str, ours: str, theirs: str,
         sys.exit(3)
 
 
+@cli.command(name="watch")
+@click.argument("path", type=str, required=True)
+@click.option("--verbose", "-v", is_flag=True, default=False, help="Show detailed scan output")
+def watch_command(path: str, verbose: bool) -> None:
+    """Watch project directory for changes and re-scan on save."""
+    watch_dir = Path(path).resolve()
+    if not watch_dir.is_dir():
+        click.echo(f"Error: '{path}' is not a directory", err=True)
+        sys.exit(1)
+
+    from alscan.watch import watch_directory
+    from alscan.services import ScanOptions
+
+    options = ScanOptions(verbose=verbose)
+    _last_reported: dict[str, set[str]] = {}
+
+    def event_cb(proj_name, result, new_findings, resolved_findings):
+        if result is None:
+            click.echo(f"  [new] {proj_name}")
+            return
+        now_str = time.strftime("%H:%M:%S")
+        click.echo(f"[{now_str}] {proj_name} — {len(result.errors)} errors, "
+                   f"{len(result.warnings)} warnings, {len(result.info)} info")
+        if verbose and new_findings:
+            for f in new_findings:
+                click.echo(f"  + {f}")
+        if verbose and resolved_findings:
+            for f in resolved_findings:
+                click.echo(f"  - {f}")
+
+    click.echo(f"Watching {watch_dir}")
+    click.echo("Press Ctrl+C to stop.")
+
+    try:
+        cancelled = [False]
+
+        def check_cancelled():
+            return cancelled[0]
+
+        watch_directory(path, event_cb=event_cb, cancelled_cb=check_cancelled,
+                       options=options)
+    except KeyboardInterrupt:
+        click.echo()
+        click.echo("Stopped.")
+
+
 if __name__ == "__main__":
     cli()
