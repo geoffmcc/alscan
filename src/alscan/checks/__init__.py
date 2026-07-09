@@ -40,4 +40,4 @@ def list_checks() -> list[Check]:
 
 
 # Import check modules so their @register decorators fire
-from alscan.checks import samples, plugins, performance, project_hygiene, duplicates, misc  # noqa: F401, E402
+from alscan.checks import samples, plugins, performance, project_hygiene, duplicates, misc, midi  # noqa: F401, E402

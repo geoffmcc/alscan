@@ -55,7 +55,12 @@ def test_frozen_returns_project_has_no_findings():
 
 
 def test_all_checks_triggered():
-    """all_checks.als triggers all 19 check types at least once."""
+    """all_checks.als triggers all expected check types at least once.
+
+    MIDI-content checks (empty_midi_clips, overlapping_notes, extreme_velocity)
+    are tested separately with synthetic data in test_midi_checks.py because the
+    all_checks.als fixture does not contain MIDI content that triggers them.
+    """
     proj = parse_als(FIXTURES / "all_checks.als")
     findings = []
     for check in list_checks():
@@ -256,6 +261,7 @@ def test_list_checks_returns_all():
     expected_all = expected | {
         "warped_clips", "master_chain_plugins",
         "extreme_tempo", "no_locators",
+        "empty_midi_clips", "overlapping_notes", "extreme_velocity",
     }
     assert names == expected_all
 

@@ -85,7 +85,7 @@ ALScan includes an optional PySide6 desktop GUI. Install with `pip install -e ".
 | **Snapshots** | Create structural snapshots and list existing ones |
 | **Compare** | Two-way structural diff between `.als` files, snapshots, or mixed |
 | **Three-Way Analysis** | Base/ours/theirs structural analysis with conflict tree |
-| **Checks** | Browse all 19 registered health checks with descriptions |
+| **Checks** | Browse all 22 registered health checks with descriptions |
 | **Settings** | Theme (system/light/dark), scan defaults, output preferences, recent items limit |
 
 All operations use the same shared service layer as the CLI — no subprocess calls or terminal scraping.
@@ -98,7 +98,7 @@ _(Screenshots to be added)_
 
 | Area | What it does |
 |------|-------------|
-| **Health scanning** | 19 checks: missing samples, broken plugins, frozen tracks, CPU-heavy plugins, duplicate samples, empty groups, warped clips, master chain plugins, and more |
+| **Health scanning** | 22 checks: missing samples, broken plugins, frozen tracks, CPU-heavy plugins, duplicate samples, empty MIDI clips, overlapping notes, extreme velocity, and more |
 | **Versioning** | Capture structural snapshots, diff across versions, view change history |
 | **Conflict analysis** | Three-way structural merge analysis with offline HTML reporting |
 | **Rich terminal output** | Color-coded findings grouped by severity (error / warning / info) |
@@ -208,6 +208,9 @@ Dark-themed static report with summary cards (error/warning/info counts), severi
 | `master_chain_plugins` | info | Master track has plugin devices |
 | `extreme_tempo` | info | Project tempo outside 40–200 BPM range |
 | `no_locators` | info | Project has no locators/markers |
+| `empty_midi_clips` | info | MIDI clips that contain no MIDI note data |
+| `overlapping_notes` | warning | MIDI notes of the same pitch that overlap in time within a clip |
+| `extreme_velocity` | info | MIDI notes with velocity at or near zero or maximum |
 
 ## Versioning (snapshot / diff / log)
 
