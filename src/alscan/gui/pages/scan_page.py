@@ -67,7 +67,7 @@ class ScanPage(QWidget):
         options_layout.addWidget(self.verbose_check)
         options_layout.addWidget(QLabel("Output format:"))
         self.format_combo = QComboBox()
-        self.format_combo.addItems(["terminal", "json", "html"])
+        self.format_combo.addItems(["terminal", "json", "html", "csv"])
         options_layout.addWidget(self.format_combo)
         options_layout.addStretch()
         layout.addWidget(options_group)
@@ -94,6 +94,11 @@ class ScanPage(QWidget):
         self.export_html_btn.clicked.connect(self._export_html)
         self.export_html_btn.setVisible(False)
         export_layout.addWidget(self.export_html_btn)
+
+        self.export_csv_btn = QPushButton("Export CSV")
+        self.export_csv_btn.clicked.connect(self._export_csv)
+        self.export_csv_btn.setVisible(False)
+        export_layout.addWidget(self.export_csv_btn)
 
         self.rescan_btn = QPushButton("Rescan")
         self.rescan_btn.clicked.connect(self._start_scan)
@@ -129,6 +134,7 @@ class ScanPage(QWidget):
         self.result_table.setVisible(False)
         self.export_json_btn.setVisible(False)
         self.export_html_btn.setVisible(False)
+        self.export_csv_btn.setVisible(False)
         self.rescan_btn.setVisible(False)
         self.status_label.setText("Scanning...")
         self.progress_bar.setRange(0, 0)
@@ -164,6 +170,7 @@ class ScanPage(QWidget):
                 self.status_label.setText("No issues found - project looks healthy!")
             self.export_json_btn.setVisible(True)
             self.export_html_btn.setVisible(True)
+            self.export_csv_btn.setVisible(True)
 
     @Slot(str, str)
     def _on_scan_error(self, message: str, details: str) -> None:
@@ -207,6 +214,23 @@ class ScanPage(QWidget):
             save_report(content, Path(path))
             webbrowser.open(Path(path).as_uri())
             QMessageBox.information(self, "Saved", f"HTML report saved and opened:\n{path}")
+        except ReportError as e:
+            QMessageBox.warning(self, "Save Error", str(e))
+
+    def _export_csv(self) -> None:
+        if not self._result:
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save CSV Report",
+            str(Path(self._result.project.path).parent / "alscan-report.csv"),
+            "CSV (*.csv);;All Files (*)"
+        )
+        if not path:
+            return
+        try:
+            content = render_health_report(self._result, "csv")
+            save_report(content, Path(path))
+            QMessageBox.information(self, "Saved", f"CSV report saved to:\n{path}")
         except ReportError as e:
             QMessageBox.warning(self, "Save Error", str(e))
 
