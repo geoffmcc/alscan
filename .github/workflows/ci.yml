@@ -46,10 +46,22 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-26
-            exe_name: alscan-macos
+          - os: ubuntu-latest
+            asset_name: alscan-x86_64-linux.tar.gz
+            cli_name: alscan
+            gui_name: alscan-gui
+          - os: macos-13
+            asset_name: alscan-x86_64-macos.tar.gz
+            cli_name: alscan
+            gui_name: alscan-gui
+          - os: macos-14
+            asset_name: alscan-aarch64-macos.tar.gz
+            cli_name: alscan
+            gui_name: alscan-gui
           - os: windows-latest
-            exe_name: alscan-windows.exe
+            asset_name: alscan-x86_64-windows.zip
+            cli_name: alscan.exe
+            gui_name: alscan-gui.exe
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
@@ -67,15 +79,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyinstaller .[gui]
 
-      - name: Build CLI standalone executable
-        run: pyinstaller --onefile --name ${{ matrix.exe_name }} --collect-submodules alscan.checks --collect-submodules alscan.report src/alscan/cli.py
+      - name: Build CLI executable
+        run: pyinstaller --onefile --name ${{ matrix.cli_name }} --collect-submodules alscan.checks --collect-submodules alscan.report src/alscan/cli.py
 
-      - name: Build GUI standalone executable
-        run: pyinstaller --onefile --name ${{ matrix.exe_name }}-gui --collect-submodules alscan.checks --collect-submodules alscan.report --collect-submodules alscan.gui --collect-submodules alscan.services src/alscan/gui/app.py
+      - name: Build GUI executable
+        run: pyinstaller --onefile --name ${{ matrix.gui_name }} --collect-submodules alscan.checks --collect-submodules alscan.report --collect-submodules alscan.gui --collect-submodules alscan.services src/alscan/gui/app.py
 
-      - name: Upload binaries to release
+      - name: Create archive (Unix)
+        if: runner.os != 'Windows'
+        run: tar czf ${{ matrix.asset_name }} -C dist ${{ matrix.cli_name }} ${{ matrix.gui_name }}
+
+      - name: Create archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path "dist/${{ matrix.cli_name }}", "dist/${{ matrix.gui_name }}" -DestinationPath "${{ matrix.asset_name }}"
+
+      - name: Upload release asset
         uses: softprops/action-gh-release@v3
         with:
-          files: |
-            dist/${{ matrix.exe_name }}*
-            dist/${{ matrix.exe_name }}-gui*
+          files: ${{ matrix.asset_name }}
