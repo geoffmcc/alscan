@@ -1,13 +1,13 @@
 [build-system]
-requires = ["setuptools>=75"]
+requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "alscan"
-version = "0.4.0"
+version = "0.5.0"
 description = "Ableton Live Project Health Scanner — analyze, version, and compare .als files"
 readme = "README.md"
-license = "MIT"
+license = "GPL-3.0-only"
 requires-python = ">=3.12"
 authors = [{ name = "Geoffrey McClinsey" }]
 keywords = ["ableton", "live", "als", "music", "production", "scanner", "analysis"]
@@ -35,6 +35,11 @@ dependencies = [
 dev = [
     "pytest>=8",
 ]
+gui = [
+    "PySide6>=6.6",
+    "pytest-qt>=4",
+    "pytest-timeout>=2",
+]
 
 [project.urls]
 Homepage = "https://github.com/geoffmcc/alscan"
@@ -43,6 +48,7 @@ Issues = "https://github.com/geoffmcc/alscan/issues"
 
 [project.scripts]
 alscan = "alscan.cli:cli"
+alscan-gui = "alscan.gui.app:run_gui"
 
 [tool.setuptools.packages.find]
 where = ["src"]

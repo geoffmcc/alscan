@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Tests for alscan.merge.plan — MergePlan dataclass and JSON serialization."""
 
 import json

@@ -27,6 +27,13 @@ alscan --version
 alscan --help
 ```
 
+To install the optional desktop GUI:
+
+```bash
+pip install -e ".[gui]"
+alscan-gui
+```
+
 To build a wheel without the source link:
 
 ```bash
@@ -41,6 +48,9 @@ pip install dist/alscan-*.whl         # macOS / Linux
 ```bash
 # Install (see installation above), then:
 alscan --help
+
+# Launch the optional desktop GUI (requires PySide6)
+alscan-gui
 
 # Scan a project for issues
 alscan scan "~/Ableton Projects/My Song/"
@@ -61,6 +71,29 @@ alscan merge-plan base.als ours.als theirs.als --output plan.json
 alscan merge-report base.als ours.als theirs.als --output report.html
 ```
 
+## Desktop GUI (optional)
+
+ALScan includes an optional PySide6 desktop GUI. Install with `pip install -e ".[gui]"` and launch with `alscan-gui`.
+
+### Pages
+
+| Page | Description |
+|------|-------------|
+| **Home** | Quick actions (scan, batch, compare, snapshot, three-way) + recent projects + drag-and-drop |
+| **Scan** | Health scan a single `.als` file or project folder with severity-filterable results table |
+| **Batch Scan** | Recursively scan all projects under a root folder with per-project status table |
+| **Snapshots** | Create structural snapshots and list existing ones |
+| **Compare** | Two-way structural diff between `.als` files, snapshots, or mixed |
+| **Three-Way Analysis** | Experimental base/ours/theirs structural analysis with conflict tree |
+| **Checks** | Browse all 19 registered health checks with descriptions |
+| **Settings** | Theme (system/light/dark), scan defaults, output preferences, recent items limit |
+
+All operations use the same shared service layer as the CLI — no subprocess calls or terminal scraping.
+
+### Screenshots
+
+_(Screenshots to be added)_
+
 ## Features
 
 | Area | What it does |
@@ -73,6 +106,7 @@ alscan merge-report base.als ours.als theirs.als --output report.html
 | **JSON output** | Machine-readable output with `--format json` |
 | **Exit codes** | `--exit-code` flag exits with code 1 when errors are found; merge-report uses 0/2/3/1 |
 | **Batch scanning** | Scan all projects under a directory with `--recursive` |
+| **Desktop GUI** | Optional PySide6 GUI with navigation, scan, batch, snapshots, compare, and three-way analysis views |
 | **Cross-platform** | Windows, macOS, Linux |
 
 ## Commands
@@ -86,8 +120,23 @@ alscan merge-report base.als ours.als theirs.als --output report.html
 | `log` | View snapshot history for a project | Stable |
 | `merge-plan` | Analyze three versions and output a JSON merge plan | Experimental |
 | `merge-report` | Analyze three versions and render an HTML conflict report | Experimental |
+| `alscan-gui` | Launch the optional PySide6 desktop GUI | New in 0.4.0 |
 
-## Output Examples
+## GUI Output Examples
+
+### Scan Page
+
+The GUI uses a sortable, filterable findings table with severity colouring, search, and a detail panel. Export results as JSON or HTML with one click.
+
+### Compare Page
+
+Structural diff results are displayed in an expandable tree with per-category sections for tempo, time signature, locators, track changes, and device changes.
+
+### Three-Way Analysis
+
+Conflict analysis results are rendered as a tree with confidence level, conflict count, auto-resolved changes, identity matches, and proposed track order. Export as JSON merge plan or HTML conflict report.
+
+## CLI Output Examples
 
 ### Terminal (default)
 
@@ -285,6 +334,14 @@ pip install -e ".[dev]"
 # Run tests
 pytest
 
+# Run GUI tests (requires PySide6 and pytest-qt, included in [gui] extra)
+pip install -e ".[gui]"
+QT_QPA_PLATFORM=offscreen pytest tests/gui/
+
+# Run all tests (CLI + services + GUI)
+pytest
+QT_QPA_PLATFORM=offscreen pytest tests/gui/ tests/test_services.py
+
 # Regenerate test fixtures
 python -m tests.fixtures.generate
 
@@ -297,8 +354,9 @@ python -m build
 - **v0.1** ✅ Project health scanning
 - **v0.2** ✅ Extended checks, JSON output, exit codes
 - **v0.3** ✅ Project versioning (snapshot / diff / log)
-- **v0.4** 🚧 Experimental three-way structural analysis and offline conflict reporting
+- **v0.4** ✅ Experimental three-way structural analysis, offline conflict reporting
+- **v0.5** 🚧 Optional PySide6 desktop GUI
 
 ## License
 
-MIT
+GNU General Public License v3 (GPL-3.0)

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Generate .als test fixtures for all 19 alscan checks.
 
 Usage: python -m tests.fixtures.generate

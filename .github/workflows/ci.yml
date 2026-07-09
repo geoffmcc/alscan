@@ -7,6 +7,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 permissions: read-all
 
 jobs:
@@ -14,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.12", "3.13"]
+        python-version: ["3.12", "3.13", "3.14"]
 
     steps:
       - uses: actions/checkout@v7
@@ -26,11 +30,20 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip setuptools wheel
           pip install -e ".[dev]"
 
-      - name: Run tests
-        run: pytest -v
+      - name: Run CLI tests
+        run: pytest -v --ignore=tests/gui
+
+      - name: Install GUI dependencies
+        run: pip install -e ".[gui]"
+
+      - name: Install Qt system dependencies
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libegl1 libgl1 libxkbcommon-x11-0
+
+      - name: Run GUI tests
+        run: QT_QPA_PLATFORM=offscreen pytest -x --timeout=120 --timeout_method=thread -v tests/gui/ tests/test_services.py
 
   build:
     needs: test
@@ -38,10 +51,22 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-26
-            exe_name: alscan-macos
+          - os: ubuntu-latest
+            asset_name: alscan-x86_64-linux.tar.gz
+            cli_name: alscan
+            gui_name: alscan-gui
+          - os: macos-13
+            asset_name: alscan-x86_64-macos.tar.gz
+            cli_name: alscan
+            gui_name: alscan-gui
+          - os: macos-14
+            asset_name: alscan-aarch64-macos.tar.gz
+            cli_name: alscan
+            gui_name: alscan-gui
           - os: windows-latest
-            exe_name: alscan-windows.exe
+            asset_name: alscan-x86_64-windows.zip
+            cli_name: alscan.exe
+            gui_name: alscan-gui.exe
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
@@ -56,13 +81,25 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install pyinstaller .
+          python -m pip install --upgrade pip setuptools wheel
+          pip install pyinstaller .[gui]
 
-      - name: Build standalone executable
-        run: pyinstaller --onefile --name ${{ matrix.exe_name }} --collect-submodules alscan.checks --collect-submodules alscan.report src/alscan/cli.py
+      - name: Build CLI executable
+        run: pyinstaller --onefile --name ${{ matrix.cli_name }} --collect-submodules alscan.checks --collect-submodules alscan.report src/alscan/cli.py
 
-      - name: Upload binary to release
+      - name: Build GUI executable
+        run: pyinstaller --onefile --name ${{ matrix.gui_name }} --collect-submodules alscan.checks --collect-submodules alscan.report --collect-submodules alscan.gui --collect-submodules alscan.services src/alscan/gui/app.py
+
+      - name: Create archive (Unix)
+        if: runner.os != 'Windows'
+        run: tar czf ${{ matrix.asset_name }} -C dist ${{ matrix.cli_name }} ${{ matrix.gui_name }}
+
+      - name: Create archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path "dist/${{ matrix.cli_name }}", "dist/${{ matrix.gui_name }}" -DestinationPath "${{ matrix.asset_name }}"
+
+      - name: Upload release asset
         uses: softprops/action-gh-release@v3
         with:
-          files: dist/${{ matrix.exe_name }}*
+          files: ${{ matrix.asset_name }}
