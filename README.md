@@ -1,4 +1,4 @@
-# alscan
+# ALScan
 
 **Ableton Live Project Health Scanner** — analyze, version, and compare `.als` project files from the command line.
 
