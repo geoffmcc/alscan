@@ -93,7 +93,7 @@ class TestGetChecks:
         names = {c.name for c in checks}
         assert "missing_samples" in names
         assert "broken_plugins" in names
-        assert len(checks) == 19
+        assert len(checks) == 22
 
     def test_get_check_by_name(self):
         c = get_check("missing_samples")
