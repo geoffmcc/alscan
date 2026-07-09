@@ -33,9 +33,7 @@ jobs:
         run: pytest -v --ignore=tests/gui
 
       - name: Install GUI dependencies
-        run: |
-          pip install -e ".[gui]"
-          pip install pytest-qt
+        run: pip install -e ".[gui]"
 
       - name: Run GUI tests
         run: QT_QPA_PLATFORM=offscreen pytest -v tests/gui/ tests/test_services.py
