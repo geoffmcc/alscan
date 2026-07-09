@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import sys
 import time
+import inspect
 from pathlib import Path
 
 import click
@@ -24,6 +25,7 @@ from alscan.report.terminal import print_terminal_report, print_batch_summary
 from alscan.report.html import generate_html_report
 from alscan.report.json import generate_json_report
 from alscan.report.csv import generate_csv_report, generate_csv_batch
+from alscan.config import CheckConfig
 from alscan.models import ScanResult
 from alscan.versioner import (
     build_snapshot,
@@ -95,11 +97,14 @@ def cli() -> None:
 @click.option("--verbose", "-v", is_flag=True, default=False, help="Show detailed output")
 @click.option("--exit-code", "-e", is_flag=True, default=False, help="Exit with code 1 if any errors found")
 @click.option("--pretty", "-p", is_flag=True, default=True, help="Pretty-print JSON output")
+@click.option("--config", "-c", type=str, default="", help="Path to .alscanrc config file")
 def scan(path: str, format: str, browser: bool, output: str, recursive: bool,
-         verbose: bool, exit_code: bool, pretty: bool) -> None:
+         verbose: bool, exit_code: bool, pretty: bool, config: str) -> None:
     """Scan an Ableton Live project for health issues."""
     scan_path = Path(path).resolve()
     any_errors = False
+
+    check_config = _load_check_config(config, scan_path)
 
     if recursive and output:
         click.echo("Error: --output is not supported with --recursive", err=True)
@@ -118,7 +123,7 @@ def scan(path: str, format: str, browser: bool, output: str, recursive: bool,
             name = proj_dir.name
             click.echo(f"[{i}/{total}] {name}...", err=True)
             try:
-                r = _scan_single(str(proj_dir), format, browser, output, verbose, pretty)
+                r = _scan_single(str(proj_dir), format, browser, output, verbose, pretty, check_config)
                 if r and len(r.errors) > 0:
                     any_errors = True
                 results.append(r)
@@ -136,7 +141,7 @@ def scan(path: str, format: str, browser: bool, output: str, recursive: bool,
                     batch_results.append((proj_dir, None, "Scan failed"))
             click.echo(generate_csv_batch(batch_results))
     else:
-        result = _scan_single(path, format, browser, output, verbose, pretty)
+        result = _scan_single(path, format, browser, output, verbose, pretty, check_config)
         if result and len(result.errors) > 0:
             any_errors = True
 
@@ -144,8 +149,36 @@ def scan(path: str, format: str, browser: bool, output: str, recursive: bool,
         sys.exit(1)
 
 
+def _load_check_config(config_path: str, project_path: Path) -> CheckConfig | None:
+    if config_path:
+        p = Path(config_path).resolve()
+        if not p.is_file():
+            click.echo(f"Warning: config file not found: {config_path}", err=True)
+            return None
+        try:
+            return CheckConfig.from_file(p)
+        except Exception as e:
+            click.echo(f"Warning: could not read config: {e}", err=True)
+            return None
+    discovered = CheckConfig.discover(project_path)
+    if discovered is not None:
+        return discovered
+    return None
+
+
+def _invoke_check_cli(check, project, config: CheckConfig | None):
+    try:
+        sig = inspect.signature(check.func)
+        if "config" in sig.parameters:
+            return check.func(project, config=config)
+    except (ValueError, TypeError):
+        pass
+    return check.func(project)
+
+
 def _scan_single(path: str, fmt: str, open_browser: bool, output_path: str,
-                 verbose: bool, pretty: bool = True) -> ScanResult | None:
+                 verbose: bool, pretty: bool = True,
+                 check_config: CheckConfig | None = None) -> ScanResult | None:
     als_file = _resolve_als_path(path)
     if als_file is None:
         return None
@@ -162,7 +195,7 @@ def _scan_single(path: str, fmt: str, open_browser: bool, output_path: str,
     findings = []
     for check in list_checks():
         try:
-            result = check.func(project)
+            result = _invoke_check_cli(check, project, check_config)
             findings.extend(result)
         except Exception as e:
             if verbose:
