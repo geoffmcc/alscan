@@ -477,18 +477,136 @@ def _analyze_matched_track_fields(plan: MergePlan, bt: dict, ot: dict, tt: dict,
 
     _, sample_warnings = merge_sample_name_union(bt.get("samples", []), ot.get("samples", []), tt.get("samples", []))
     plan.warnings.extend(sample_warnings)
-    _, dev_conflict = three_way_device_list(bt.get("devices", []), ot.get("devices", []), tt.get("devices", []))
-    if dev_conflict:
+    _analyze_device_lists(plan, bt.get("devices", []), ot.get("devices", []), tt.get("devices", []), tid, ot.get("name", ""))
+
+
+def _device_id_sig(dev: dict) -> tuple:
+    return (dev.get("name"), dev.get("device_type"),
+            dev.get("plugin_name"), dev.get("plugin_type"))
+
+
+def _device_type_sig(dev: dict) -> tuple:
+    return (dev.get("device_type"), dev.get("plugin_name"),
+            dev.get("plugin_type"))
+
+
+def _analyze_device_lists(
+    plan: MergePlan,
+    base: list[dict],
+    ours: list[dict],
+    theirs: list[dict],
+    track_id: int,
+    track_name: str,
+) -> None:
+    if not base and not ours and not theirs:
+        return
+    if ours == theirs:
+        return
+
+    matched_base: set[int] = set()
+    matched_ours: set[int] = set()
+    matched_theirs: set[int] = set()
+
+    for bi, bd in enumerate(base):
+        bs = _device_id_sig(bd)
+        for oi, od in enumerate(ours):
+            if oi in matched_ours:
+                continue
+            os = _device_id_sig(od)
+            for ti, td in enumerate(theirs):
+                if ti in matched_theirs:
+                    continue
+                ts = _device_id_sig(td)
+                if bs == os == ts:
+                    matched_base.add(bi)
+                    matched_ours.add(oi)
+                    matched_theirs.add(ti)
+                    break
+                elif bs == os or bs == ts:
+                    matched_base.add(bi)
+                    if bs == os:
+                        matched_ours.add(oi)
+                    else:
+                        matched_theirs.add(ti)
+                    break
+                elif _device_type_sig(bd) == _device_type_sig(od) == _device_type_sig(td):
+                    matched_base.add(bi)
+                    matched_ours.add(oi)
+                    matched_theirs.add(ti)
+                    plan.warnings.append(
+                        f"Plausible device match on track \"{track_name}\": "
+                        f"\"{bd.get('name')}\" (base={bi}, ours={oi}, theirs={ti}) "
+                        f"— identical type and plugin reference but different names"
+                    )
+                    break
+            if bi in matched_base:
+                break
+
+    ours_added = [od for oi, od in enumerate(ours) if oi not in matched_ours]
+    theirs_added = [td for ti, td in enumerate(theirs) if ti not in matched_theirs]
+    ours_removed = [od for oi, od in enumerate(ours) if oi not in matched_ours]
+    theirs_removed = [td for ti, td in enumerate(theirs) if ti not in matched_theirs]
+    base_removed = [bd for bi, bd in enumerate(base) if bi not in matched_base]
+
+    has_ours_change = bool(ours_added or base_removed)
+    has_theirs_change = bool(theirs_added or base_removed)
+    ours_different = ours != base
+    theirs_different = theirs != base
+
+    if ours_different and theirs_different and has_ours_change and has_theirs_change:
         plan.conflicts.append(Conflict(
-            id=f"conflict-track-{tid}-devices",
+            id=f"conflict-track-{track_id}-devices",
             field="track.devices",
-            base_value=[d.get("name") for d in bt.get("devices", [])],
-            ours_value=[d.get("name") for d in ot.get("devices", [])],
-            theirs_value=[d.get("name") for d in tt.get("devices", [])],
-            reason="Both sides changed device list differently",
+            base_value=[d.get("name") for d in base],
+            ours_value=[d.get("name") for d in ours],
+            theirs_value=[d.get("name") for d in theirs],
+            reason="Both sides changed the device list independently",
             risk="medium",
             available_resolutions=["accept_ours", "accept_theirs", "retain_base"],
         ))
+    elif ours_different:
+        for d in _devices_not_in(base, ours):
+            plan.auto_resolved.append(AutoResolved(
+                id=f"device-added-ours-{track_id}-{_safe_id(d.get('name', ''))}",
+                field="track.devices",
+                base_value=None,
+                resolved_value=d.get("name"),
+                resolution=f"Device \"{d.get('name')}\" added in ours",
+                description="Added device not present in base or theirs",
+            ))
+        for d in _devices_not_in(ours, base):
+            plan.auto_resolved.append(AutoResolved(
+                id=f"device-removed-ours-{track_id}-{_safe_id(d.get('name', ''))}",
+                field="track.devices",
+                base_value=d.get("name"),
+                resolved_value=None,
+                resolution=f"Device \"{d.get('name')}\" removed in ours",
+                description="Device present in base removed in ours",
+            ))
+    elif theirs_different:
+        for d in _devices_not_in(base, theirs):
+            plan.auto_resolved.append(AutoResolved(
+                id=f"device-added-theirs-{track_id}-{_safe_id(d.get('name', ''))}",
+                field="track.devices",
+                base_value=None,
+                resolved_value=d.get("name"),
+                resolution=f"Device \"{d.get('name')}\" added in theirs",
+                description="Added device not present in base or ours",
+            ))
+        for d in _devices_not_in(theirs, base):
+            plan.auto_resolved.append(AutoResolved(
+                id=f"device-removed-theirs-{track_id}-{_safe_id(d.get('name', ''))}",
+                field="track.devices",
+                base_value=d.get("name"),
+                resolved_value=None,
+                resolution=f"Device \"{d.get('name')}\" removed in theirs",
+                description="Device present in base removed in theirs",
+            ))
+
+
+def _devices_not_in(a: list[dict], b: list[dict]) -> list[dict]:
+    b_sigs = {_device_id_sig(d) for d in b}
+    return [d for d in a if _device_id_sig(d) not in b_sigs]
 
 
 def _analyze_additions(plan: MergePlan, base_tracks: list[dict], ours_tracks: list[dict], theirs_tracks: list[dict], reverse: dict[str, dict[int, int]]) -> None:
