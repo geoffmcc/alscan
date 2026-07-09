@@ -58,7 +58,7 @@ def build_merge_plan(inputs: ThreeWayInput) -> MergePlan:
     }
 
     if inputs.mode == "snapshot":
-        plan.warnings.append(
+        plan.notices.append(
             "Source hashes identify the alscan snapshot files, not the "
             "original Ableton projects. Original .als hashes are not "
             "available from snapshot data."
@@ -690,15 +690,6 @@ def _remove_exact_locator_matches(plan: MergePlan, base: list[dict], ours: list[
                 used_base.add(bi)
                 used_ours.add(oi)
                 used_theirs.add(ti)
-                plan.locator_changes.append(LocatorChange(
-                    id=f"locator-{_safe_id(bl.get('name'))}-{_safe_id(bl.get('time'))}-unchanged",
-                    kind="unchanged",
-                    name=bl.get("name"),
-                    base_time=bl.get("time"),
-                    ours_time=ol.get("time"),
-                    theirs_time=tl.get("time"),
-                    auto_resolved=True,
-                ))
                 break
             if bi in used_base:
                 break

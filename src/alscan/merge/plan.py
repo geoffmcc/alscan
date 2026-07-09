@@ -111,6 +111,7 @@ class MergePlan:
 
     file_differences_detected: bool = False
     warnings: list[str] = field(default_factory=list)
+    notices: list[str] = field(default_factory=list)
 
     def to_json(self) -> str:
         d = asdict(self)
