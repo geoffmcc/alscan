@@ -98,7 +98,7 @@ def _structural_fingerprint(proj: Project) -> str:
         for d in t.devices:
             h.update(f"  dev:{d.name}:{d.device_type}:{d.is_frozen}\n".encode())
             if d.plugin_ref:
-                h.update(f"  plugin:{d.plugin_ref.name}:{d.plugin_ref.plugin_type}\n".encode())
+                h.update(f"  plugin:{d.plugin_ref.name}:{d.plugin_ref.plugin_type}:{d.plugin_ref.version}\n".encode())
         for c in t.clips:
             h.update(f"  clip:{c.name}:{c.clip_type}\n".encode())
             if c.sample_ref:
@@ -126,6 +126,7 @@ def _track_dict(track) -> dict:
                 "is_frozen": d.is_frozen,
                 "plugin_name": d.plugin_ref.name if d.plugin_ref else None,
                 "plugin_type": d.plugin_ref.plugin_type if d.plugin_ref else None,
+                "plugin_version": d.plugin_ref.version if d.plugin_ref and d.plugin_ref.version else None,
             }
             for d in track.devices
         ],
@@ -238,16 +239,19 @@ class DeviceDiff:
     added: list[dict] = None
     removed: list[dict] = None
     order_changed: bool = False
+    version_changes: list[dict] = None
 
     def __post_init__(self):
         if self.added is None:
             self.added = []
         if self.removed is None:
             self.removed = []
+        if self.version_changes is None:
+            self.version_changes = []
 
     @property
     def has_changes(self) -> bool:
-        return bool(self.added) or bool(self.removed) or self.order_changed
+        return bool(self.added) or bool(self.removed) or self.order_changed or bool(self.version_changes)
 
 
 @dataclass
@@ -323,6 +327,28 @@ def _compare_device_lists(old_devices: list[dict],
 
     removed = old_remaining
     return added, removed, False
+
+
+def _detect_version_changes(old_devices: list[dict], new_devices: list[dict]) -> list[dict]:
+    version_changes = []
+    old_sigs = [_device_signature(d) for d in old_devices]
+    new_sigs = [_device_signature(d) for d in new_devices]
+    old_remaining = list(old_devices)
+    for new_dev in new_devices:
+        ns = _device_signature(new_dev)
+        for i, old_dev in enumerate(old_remaining):
+            if _device_signature(old_dev) == ns:
+                old_remaining.pop(i)
+                old_ver = old_dev.get("plugin_version") or None
+                new_ver = new_dev.get("plugin_version") or None
+                if old_ver and new_ver and old_ver != new_ver:
+                    version_changes.append({
+                        "device_name": new_dev.get("name", ""),
+                        "old_version": old_ver,
+                        "new_version": new_ver,
+                    })
+                break
+    return version_changes
 
 
 def diff_snapshots(a: Snapshot, b: Snapshot) -> DiffResult:
@@ -402,13 +428,15 @@ def diff_snapshots(a: Snapshot, b: Snapshot) -> DiffResult:
             new_devs = tb.get("devices", [])
             if old_devs or new_devs:
                 dev_added, dev_removed, dev_order = _compare_device_lists(old_devs, new_devs)
-                if dev_added or dev_removed or dev_order:
+                version_changes = _detect_version_changes(old_devs, new_devs)
+                if dev_added or dev_removed or dev_order or version_changes:
                     result.device_changes.append(DeviceDiff(
                         track_id=tid,
                         track_name=tb["name"],
                         added=dev_added,
                         removed=dev_removed,
                         order_changed=dev_order,
+                        version_changes=version_changes,
                     ))
 
     return result

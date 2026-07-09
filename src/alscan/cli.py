@@ -444,6 +444,8 @@ def diff(path_a: str, path_b: str | None, snapshot: int | None) -> None:
                 click.echo(f"        - \"{label}\"")
             if dc.order_changed:
                 click.echo("        ~ device order changed")
+            for vc in dc.version_changes:
+                click.echo(f'        ~ "{vc["device_name"]}" version: {vc["old_version"]} -> {vc["new_version"]}')
 
 
 @cli.command()
