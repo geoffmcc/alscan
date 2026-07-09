@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Tests for alscan.io_safety — shared I/O safety module."""
 
 from pathlib import Path

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Integration tests for alscan merge commands via CliRunner."""
 
 import json

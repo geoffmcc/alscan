@@ -1,1 +1,2 @@
-__version__ = "0.3.2"
+# SPDX-License-Identifier: GPL-3.0-only
+__version__ = "0.5.0"

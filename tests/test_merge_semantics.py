@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Tests for alscan.merge.semantics — three-way field semantics."""
 
 from alscan.merge.semantics import (

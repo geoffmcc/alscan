@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Tests for alscan — Ableton Live project parser and health checks."""
 
 from pathlib import Path

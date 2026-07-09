@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-only
 """Three-way structural merge analysis for Ableton Live projects."""
 
 from alscan.merge.inputs import validate_three_way, normalize_snapshot_json, assess_lineage, ThreeWayInput, LineageResult, DocumentType
