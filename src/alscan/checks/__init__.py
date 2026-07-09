@@ -4,18 +4,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable, Literal
 
+from alscan.models import Finding  # noqa: F401 — re-exported for check modules
+
 Severity = Literal["error", "warning", "info", "suggestion"]
-
-
-@dataclass
-class Finding:
-    severity: Severity
-    check_name: str
-    title: str
-    message: str
-    location: str = ""
-    suggestion: str = ""
-    file_path: str = ""
 
 
 @dataclass

@@ -452,8 +452,5 @@ class ThreeWayPage(QWidget):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if btn == QMessageBox.StandardButton.Yes:
-            folder = str(dest.parent)
-            if os.name == "nt":
-                os.startfile(folder)
-            else:
-                subprocess.run(["open" if os.uname().sysname == "Darwin" else "xdg-open", folder])
+            from alscan.gui.platform_utils import open_folder
+            open_folder(dest.parent)

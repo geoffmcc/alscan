@@ -436,8 +436,11 @@ def log(path: str) -> None:
 @click.option("--output", "-O", type=str, default="", help="Write merge plan to file")
 @click.option("--allow-unrelated", is_flag=True, default=False,
               help="Allow analysis of structurally unrelated projects")
+@click.option("--allow-plausible", is_flag=True, default=False,
+              help="Allow plausible track identity matching when track IDs differ")
 def merge_plan_command(base: str, ours: str, theirs: str,
-                       output: str, allow_unrelated: bool) -> None:
+                       output: str, allow_unrelated: bool,
+                       allow_plausible: bool) -> None:
     """Analyze three project versions and produce a merge plan.
 
     BASE, OURS, and THEIRS must be paths to .als files or alscan
@@ -451,7 +454,8 @@ def merge_plan_command(base: str, ours: str, theirs: str,
     """
     try:
         inputs = validate_three_way(base, ours, theirs,
-                                    allow_unrelated=allow_unrelated)
+                                    allow_unrelated=allow_unrelated,
+                                    allow_plausible=allow_plausible)
     except (FileNotFoundError, ValueError) as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
@@ -496,8 +500,11 @@ def merge_plan_command(base: str, ours: str, theirs: str,
 @click.option("--output", "-O", type=str, required=True, help="Write HTML merge report to file")
 @click.option("--allow-unrelated", is_flag=True, default=False,
               help="Allow analysis of structurally unrelated projects")
+@click.option("--allow-plausible", is_flag=True, default=False,
+              help="Allow plausible track identity matching when track IDs differ")
 def merge_report_command(base: str, ours: str, theirs: str,
-                         output: str, allow_unrelated: bool) -> None:
+                         output: str, allow_unrelated: bool,
+                         allow_plausible: bool) -> None:
     """Analyze three versions and render an HTML conflict report.
 
     BASE, OURS, and THEIRS must be paths to .als files or alscan
@@ -509,7 +516,8 @@ def merge_report_command(base: str, ours: str, theirs: str,
     """
     try:
         inputs = validate_three_way(base, ours, theirs,
-                                    allow_unrelated=allow_unrelated)
+                                    allow_unrelated=allow_unrelated,
+                                    allow_plausible=allow_plausible)
     except (FileNotFoundError, ValueError) as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
