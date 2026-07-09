@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import time
 import inspect
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Literal
 
@@ -18,7 +18,7 @@ from alscan.merge.analysis import build_merge_plan
 from alscan.merge.inputs import validate_three_way
 from alscan.merge.plan import MergePlan
 from alscan.merge.report import render_merge_report
-from alscan.models import ScanResult
+from alscan.models import Finding, ScanResult
 from alscan.parser import parse_als
 from alscan.project import find_als_file, find_projects
 from alscan.report.html import generate_html_report
@@ -42,7 +42,7 @@ CancelledCb = Callable[[], bool]
 """Callback that returns True if the operation should be cancelled."""
 
 
-def _invoke_check(check: Check, project, config: CheckConfig | None, search_paths: list[str] | None = None):
+def _invoke_check(check: Check, project, config: CheckConfig | None, search_paths: list[str] | None = None, candidate_limit: int = 5):
     try:
         sig = inspect.signature(check.func)
         kwargs: dict[str, object] = {}
@@ -50,6 +50,8 @@ def _invoke_check(check: Check, project, config: CheckConfig | None, search_path
             kwargs["config"] = config
         if "search_paths" in sig.parameters:
             kwargs["search_paths"] = search_paths or []
+        if "candidate_limit" in sig.parameters:
+            kwargs["candidate_limit"] = candidate_limit
         if kwargs:
             return check.func(project, **kwargs)
     except (ValueError, TypeError):
@@ -84,6 +86,7 @@ class ScanOptions:
     pretty: bool = True
     check_config: CheckConfig | None = None
     search_paths: list[str] | None = None
+    candidate_limit: int = 5
 
 
 @dataclass
@@ -146,11 +149,12 @@ def scan_project(
     checks = list_checks()
     config = options.check_config if options else None
     search_paths = options.search_paths if options else None
+    candidate_limit = options.candidate_limit if options else 5
     for i, check in enumerate(checks):
         if cancelled_cb and cancelled_cb():
             raise ScanError("Scan cancelled")
         try:
-            result = _invoke_check(check, project, config, search_paths)
+            result = _invoke_check(check, project, config, search_paths, candidate_limit)
             findings.extend(result)
         except Exception as e:
             findings.append(Finding(

@@ -217,8 +217,7 @@ def _parse_plugin(dev_el):
             return PluginRef(name=name, plugin_type="vst3", path=path, unique_id=uid, version=version)
         elif tag == "AuPluginInfo":
             mfr = _gv(info, "Manufacturer", "Value", "")
-            version = _gv(info, "SubType", "Value", "")
-            return PluginRef(name=name, plugin_type="au", path=path, manufacturer=mfr, version=version)
+            return PluginRef(name=name, plugin_type="au", path=path, manufacturer=mfr)
     return None
 
 
