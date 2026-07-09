@@ -42,11 +42,16 @@ CancelledCb = Callable[[], bool]
 """Callback that returns True if the operation should be cancelled."""
 
 
-def _invoke_check(check: Check, project, config: CheckConfig | None):
+def _invoke_check(check: Check, project, config: CheckConfig | None, search_paths: list[str] | None = None):
     try:
         sig = inspect.signature(check.func)
+        kwargs: dict[str, object] = {}
         if "config" in sig.parameters:
-            return check.func(project, config=config)
+            kwargs["config"] = config
+        if "search_paths" in sig.parameters:
+            kwargs["search_paths"] = search_paths or []
+        if kwargs:
+            return check.func(project, **kwargs)
     except (ValueError, TypeError):
         pass
     return check.func(project)
@@ -78,6 +83,7 @@ class ScanOptions:
     verbose: bool = False
     pretty: bool = True
     check_config: CheckConfig | None = None
+    search_paths: list[str] | None = None
 
 
 @dataclass
@@ -139,11 +145,12 @@ def scan_project(
     findings = []
     checks = list_checks()
     config = options.check_config if options else None
+    search_paths = options.search_paths if options else None
     for i, check in enumerate(checks):
         if cancelled_cb and cancelled_cb():
             raise ScanError("Scan cancelled")
         try:
-            result = _invoke_check(check, project, config)
+            result = _invoke_check(check, project, config, search_paths)
             findings.extend(result)
         except Exception as e:
             findings.append(Finding(

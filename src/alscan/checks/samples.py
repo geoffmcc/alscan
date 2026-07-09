@@ -6,7 +6,7 @@ from alscan.models import Project
 
 
 @register("missing_samples", severity="error", description="Audio files referenced but not found on disk")
-def check_missing_samples(project: Project) -> list[Finding]:
+def check_missing_samples(project: Project, search_paths: list[str] | None = None) -> list[Finding]:
     findings = []
     for track in project.tracks:
         for clip in track.clips:
@@ -14,14 +14,32 @@ def check_missing_samples(project: Project) -> list[Finding]:
                 continue
             ref = clip.sample_ref
             if not ref.exists(project.path):
+                candidates = []
+                if search_paths:
+                    from alscan.search import search_sample
+                    candidates_raw = search_sample(
+                        ref.name, search_paths,
+                        file_size=ref.original_file_size,
+                        candidate_limit=5,
+                    )
+                    candidates = [
+                        {"path": c.path, "confidence": c.confidence,
+                         "match_type": c.match_type, "file_size": c.file_size}
+                        for c in candidates_raw
+                    ]
+                suggestion = "Re-link the sample in Ableton or use Collect All and Save"
+                if candidates:
+                    top = candidates[0]
+                    suggestion += f" | Closest candidate: {top['path']} ({top['confidence']})"
                 findings.append(Finding(
                     severity="error",
                     check_name="missing_samples",
                     title="Missing Sample",
                     message=f'Sample "{ref.name}" not found at: {ref.path}',
                     location=f"Track: {track.name} > Clip: {clip.name or '(unnamed)'}",
-                    suggestion="Re-link the sample in Ableton or use Collect All and Save",
+                    suggestion=suggestion,
                     file_path=str(ref.path),
+                    candidates=candidates,
                 ))
             elif ref.relative_path_type != 3:
                 findings.append(Finding(
