@@ -212,10 +212,12 @@ def _parse_plugin(dev_el):
             return PluginRef(name=name, plugin_type="vst2", path=path, unique_id=uid)
         elif tag == "Vst3PluginInfo":
             uid = _gv(info, "PluginId", "Value", "")
-            return PluginRef(name=name, plugin_type="vst3", path=path, unique_id=uid)
+            version = _gv(info, "PluginVersion", "Value", "")
+            return PluginRef(name=name, plugin_type="vst3", path=path, unique_id=uid, version=version)
         elif tag == "AuPluginInfo":
             mfr = _gv(info, "Manufacturer", "Value", "")
-            return PluginRef(name=name, plugin_type="au", path=path, manufacturer=mfr)
+            version = _gv(info, "SubType", "Value", "")
+            return PluginRef(name=name, plugin_type="au", path=path, manufacturer=mfr, version=version)
     return None
 
 

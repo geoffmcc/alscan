@@ -43,6 +43,7 @@ class PluginRef:
     unique_id: str = ""
     manufacturer: str = ""
     is_builtin: bool = False
+    version: str = ""
 
     def exists(self) -> bool:
         if self.is_builtin:
