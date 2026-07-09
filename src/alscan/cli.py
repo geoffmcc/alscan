@@ -98,13 +98,18 @@ def cli() -> None:
 @click.option("--exit-code", "-e", is_flag=True, default=False, help="Exit with code 1 if any errors found")
 @click.option("--pretty", "-p", is_flag=True, default=True, help="Pretty-print JSON output")
 @click.option("--config", "-c", type=str, default="", help="Path to .alscanrc config file")
+@click.option("--search-paths", "-s", type=str, default="", help="Additional sample search paths (comma-separated)")
+@click.option("--no-default-paths", is_flag=True, default=False, help="Do not search default Ableton library paths")
+@click.option("--candidate-limit", type=int, default=5, help="Max candidates per missing sample (default: 5)")
 def scan(path: str, format: str, browser: bool, output: str, recursive: bool,
-         verbose: bool, exit_code: bool, pretty: bool, config: str) -> None:
+         verbose: bool, exit_code: bool, pretty: bool, config: str,
+         search_paths: str, no_default_paths: bool, candidate_limit: int) -> None:
     """Scan an Ableton Live project for health issues."""
     scan_path = Path(path).resolve()
     any_errors = False
 
     check_config = _load_check_config(config, scan_path)
+    _sp = _build_search_paths(search_paths, no_default_paths)
 
     if recursive and output:
         click.echo("Error: --output is not supported with --recursive", err=True)
@@ -123,7 +128,7 @@ def scan(path: str, format: str, browser: bool, output: str, recursive: bool,
             name = proj_dir.name
             click.echo(f"[{i}/{total}] {name}...", err=True)
             try:
-                r = _scan_single(str(proj_dir), format, browser, output, verbose, pretty, check_config)
+                r = _scan_single(str(proj_dir), format, browser, output, verbose, pretty, check_config, _sp)
                 if r and len(r.errors) > 0:
                     any_errors = True
                 results.append(r)
@@ -141,7 +146,7 @@ def scan(path: str, format: str, browser: bool, output: str, recursive: bool,
                     batch_results.append((proj_dir, None, "Scan failed"))
             click.echo(generate_csv_batch(batch_results))
     else:
-        result = _scan_single(path, format, browser, output, verbose, pretty, check_config)
+        result = _scan_single(path, format, browser, output, verbose, pretty, check_config, _sp)
         if result and len(result.errors) > 0:
             any_errors = True
 
@@ -166,11 +171,30 @@ def _load_check_config(config_path: str, project_path: Path) -> CheckConfig | No
     return None
 
 
-def _invoke_check_cli(check, project, config: CheckConfig | None):
+def _build_search_paths(search_paths_str: str, no_default_paths: bool) -> list[str] | None:
+    paths = []
+    if not no_default_paths:
+        from alscan.search import known_sample_dirs
+        for d in known_sample_dirs():
+            paths.append(str(d))
+    if search_paths_str:
+        for p in search_paths_str.split(","):
+            p = p.strip()
+            if p:
+                paths.append(p)
+    return paths if paths else None
+
+
+def _invoke_check_cli(check, project, config: CheckConfig | None, search_paths: list[str] | None = None):
     try:
         sig = inspect.signature(check.func)
+        kwargs: dict[str, object] = {}
         if "config" in sig.parameters:
-            return check.func(project, config=config)
+            kwargs["config"] = config
+        if "search_paths" in sig.parameters:
+            kwargs["search_paths"] = search_paths or []
+        if kwargs:
+            return check.func(project, **kwargs)
     except (ValueError, TypeError):
         pass
     return check.func(project)
@@ -178,7 +202,8 @@ def _invoke_check_cli(check, project, config: CheckConfig | None):
 
 def _scan_single(path: str, fmt: str, open_browser: bool, output_path: str,
                  verbose: bool, pretty: bool = True,
-                 check_config: CheckConfig | None = None) -> ScanResult | None:
+                 check_config: CheckConfig | None = None,
+                 search_paths: list[str] | None = None) -> ScanResult | None:
     als_file = _resolve_als_path(path)
     if als_file is None:
         return None
@@ -195,7 +220,7 @@ def _scan_single(path: str, fmt: str, open_browser: bool, output_path: str,
     findings = []
     for check in list_checks():
         try:
-            result = _invoke_check_cli(check, project, check_config)
+            result = _invoke_check_cli(check, project, check_config, search_paths)
             findings.extend(result)
         except Exception as e:
             if verbose:

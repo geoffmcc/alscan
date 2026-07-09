@@ -110,9 +110,10 @@ class Finding:
     location: str = ""
     suggestion: str = ""
     file_path: str = ""
+    candidates: list[dict] = field(default_factory=list)
 
     def dict(self) -> dict:
-        return {
+        result = {
             "severity": self.severity,
             "check_name": self.check_name,
             "title": self.title,
@@ -121,6 +122,9 @@ class Finding:
             "suggestion": self.suggestion,
             "file_path": self.file_path,
         }
+        if self.candidates:
+            result["candidates"] = self.candidates
+        return result
 
 
 @dataclass

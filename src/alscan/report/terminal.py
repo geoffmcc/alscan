@@ -101,6 +101,10 @@ def print_terminal_report(result: ScanResult, verbose: bool = False) -> str:
                 console.print(f"    Suggestion: {finding.suggestion}")
             if finding.file_path:
                 console.print(f"    File:      {finding.file_path}")
+            if finding.candidates:
+                for i, c in enumerate(finding.candidates[:3]):
+                    conf = c.get("confidence", "?")
+                    console.print(f"    Candidate {i + 1}: {c['path']} ({conf})")
         console.print()
 
     console.print(f"[dim]Scan completed in {result.scan_time_ms}ms[/dim]")
