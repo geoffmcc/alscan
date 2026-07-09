@@ -127,6 +127,7 @@ def _track_dict(track) -> dict:
                 "plugin_name": d.plugin_ref.name if d.plugin_ref else None,
                 "plugin_type": d.plugin_ref.plugin_type if d.plugin_ref else None,
                 "plugin_version": d.plugin_ref.version if d.plugin_ref and d.plugin_ref.version else None,
+                "params": d.params if d.params else None,
             }
             for d in track.devices
         ],
@@ -240,6 +241,7 @@ class DeviceDiff:
     removed: list[dict] = None
     order_changed: bool = False
     version_changes: list[dict] = None
+    param_changes: list[dict] = None
 
     def __post_init__(self):
         if self.added is None:
@@ -248,10 +250,12 @@ class DeviceDiff:
             self.removed = []
         if self.version_changes is None:
             self.version_changes = []
+        if self.param_changes is None:
+            self.param_changes = []
 
     @property
     def has_changes(self) -> bool:
-        return bool(self.added) or bool(self.removed) or self.order_changed or bool(self.version_changes)
+        return bool(self.added) or bool(self.removed) or self.order_changed or bool(self.version_changes) or bool(self.param_changes)
 
 
 @dataclass
@@ -351,6 +355,35 @@ def _detect_version_changes(old_devices: list[dict], new_devices: list[dict]) ->
     return version_changes
 
 
+def _detect_param_changes(old_devices: list[dict], new_devices: list[dict]) -> list[dict]:
+    param_changes = []
+    old_sigs = [_device_signature(d) for d in old_devices]
+    old_remaining = list(old_devices)
+    for new_dev in new_devices:
+        ns = _device_signature(new_dev)
+        for i, old_dev in enumerate(old_remaining):
+            if _device_signature(old_dev) == ns:
+                old_remaining.pop(i)
+                old_params = old_dev.get("params") or {}
+                new_params = new_dev.get("params") or {}
+                changes: dict[str, tuple] = {}
+                for key in set(old_params) | set(new_params):
+                    old_v = old_params.get(key)
+                    new_v = new_params.get(key)
+                    if old_v != new_v:
+                        if isinstance(old_v, float) and isinstance(new_v, float):
+                            if abs(old_v - new_v) < 1e-6:
+                                continue
+                        changes[key] = (old_v, new_v)
+                if changes:
+                    param_changes.append({
+                        "device_name": new_dev.get("name", ""),
+                        "changes": {k: {"old": v[0], "new": v[1]} for k, v in changes.items()},
+                    })
+                break
+    return param_changes
+
+
 def diff_snapshots(a: Snapshot, b: Snapshot) -> DiffResult:
     result = DiffResult(
         project_a=a.project_name,
@@ -429,7 +462,8 @@ def diff_snapshots(a: Snapshot, b: Snapshot) -> DiffResult:
             if old_devs or new_devs:
                 dev_added, dev_removed, dev_order = _compare_device_lists(old_devs, new_devs)
                 version_changes = _detect_version_changes(old_devs, new_devs)
-                if dev_added or dev_removed or dev_order or version_changes:
+                param_changes = _detect_param_changes(old_devs, new_devs)
+                if dev_added or dev_removed or dev_order or version_changes or param_changes:
                     result.device_changes.append(DeviceDiff(
                         track_id=tid,
                         track_name=tb["name"],
@@ -437,6 +471,7 @@ def diff_snapshots(a: Snapshot, b: Snapshot) -> DiffResult:
                         removed=dev_removed,
                         order_changed=dev_order,
                         version_changes=version_changes,
+                        param_changes=param_changes,
                     ))
 
     return result

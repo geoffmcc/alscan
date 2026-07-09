@@ -73,6 +73,7 @@ class Device:
     device_type: str
     plugin_ref: PluginRef | None = None
     is_frozen: bool = False
+    params: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass
