@@ -70,11 +70,33 @@ def search_sample(
                     seen.add(mp)
                     if not match.is_file():
                         continue
-                    _score_candidate(candidates, match, name, file_size, sha256)
+                    if _name_matches(match.name, name):
+                        _score_candidate(candidates, match, name, file_size, sha256)
             except (OSError, PermissionError):
                 continue
+        try:
+            for match in base.rglob("*"):
+                if cancelled_cb and cancelled_cb():
+                    return _rank_candidates(candidates)[:candidate_limit]
+                if not match.is_file():
+                    continue
+                if not _name_matches(match.name, name):
+                    continue
+                mp = str(match.resolve())
+                if mp in seen:
+                    continue
+                seen.add(mp)
+                _score_candidate(candidates, match, name, file_size, sha256)
+        except (OSError, PermissionError):
+            continue
 
     return _rank_candidates(candidates)[:candidate_limit]
+
+
+def _name_matches(actual: str, expected: str) -> bool:
+    actual_lower = actual.lower()
+    expected_lower = expected.lower()
+    return expected_lower in actual_lower or actual_lower.startswith(expected_lower)
 
 
 def _score_candidate(

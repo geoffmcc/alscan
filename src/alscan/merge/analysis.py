@@ -544,8 +544,6 @@ def _analyze_device_lists(
 
     ours_added = [od for oi, od in enumerate(ours) if oi not in matched_ours]
     theirs_added = [td for ti, td in enumerate(theirs) if ti not in matched_theirs]
-    ours_removed = [od for oi, od in enumerate(ours) if oi not in matched_ours]
-    theirs_removed = [td for ti, td in enumerate(theirs) if ti not in matched_theirs]
     base_removed = [bd for bi, bd in enumerate(base) if bi not in matched_base]
 
     has_ours_change = bool(ours_added or base_removed)

@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 import sys
 import time
-import inspect
 from pathlib import Path
 
 import click
@@ -33,7 +32,6 @@ from alscan.versioner import (
     load_snapshot,
     find_snapshots,
     diff_snapshots,
-    DeviceDiff,
     Snapshot,
     SNAPSHOT_FORMAT_VERSION,
 )
@@ -108,6 +106,10 @@ def scan(path: str, format: str, browser: bool, output: str, recursive: bool,
     scan_path = Path(path).resolve()
     any_errors = False
 
+    if candidate_limit < 0:
+        click.echo("Error: --candidate-limit must be >= 0", err=True)
+        sys.exit(1)
+
     check_config = _load_check_config(config, scan_path)
     _sp = _build_search_paths(search_paths, no_default_paths)
 
@@ -128,7 +130,7 @@ def scan(path: str, format: str, browser: bool, output: str, recursive: bool,
             name = proj_dir.name
             click.echo(f"[{i}/{total}] {name}...", err=True)
             try:
-                r = _scan_single(str(proj_dir), format, browser, output, verbose, pretty, check_config, _sp)
+                r = _scan_single(str(proj_dir), format, browser, output, verbose, pretty, check_config, _sp, candidate_limit)
                 if r and len(r.errors) > 0:
                     any_errors = True
                 results.append(r)
@@ -146,7 +148,7 @@ def scan(path: str, format: str, browser: bool, output: str, recursive: bool,
                     batch_results.append((proj_dir, None, "Scan failed"))
             click.echo(generate_csv_batch(batch_results))
     else:
-        result = _scan_single(path, format, browser, output, verbose, pretty, check_config, _sp)
+        result = _scan_single(path, format, browser, output, verbose, pretty, check_config, _sp, candidate_limit)
         if result and len(result.errors) > 0:
             any_errors = True
 
@@ -185,25 +187,14 @@ def _build_search_paths(search_paths_str: str, no_default_paths: bool) -> list[s
     return paths if paths else None
 
 
-def _invoke_check_cli(check, project, config: CheckConfig | None, search_paths: list[str] | None = None):
-    try:
-        sig = inspect.signature(check.func)
-        kwargs: dict[str, object] = {}
-        if "config" in sig.parameters:
-            kwargs["config"] = config
-        if "search_paths" in sig.parameters:
-            kwargs["search_paths"] = search_paths or []
-        if kwargs:
-            return check.func(project, **kwargs)
-    except (ValueError, TypeError):
-        pass
-    return check.func(project)
+from alscan.services import _invoke_check as _invoke_check_cli
 
 
 def _scan_single(path: str, fmt: str, open_browser: bool, output_path: str,
                  verbose: bool, pretty: bool = True,
                  check_config: CheckConfig | None = None,
-                 search_paths: list[str] | None = None) -> ScanResult | None:
+                 search_paths: list[str] | None = None,
+                 candidate_limit: int = 5) -> ScanResult | None:
     als_file = _resolve_als_path(path)
     if als_file is None:
         return None
@@ -220,7 +211,7 @@ def _scan_single(path: str, fmt: str, open_browser: bool, output_path: str,
     findings = []
     for check in list_checks():
         try:
-            result = _invoke_check_cli(check, project, check_config, search_paths)
+            result = _invoke_check_cli(check, project, check_config, search_paths, candidate_limit)
             findings.extend(result)
         except Exception as e:
             if verbose:

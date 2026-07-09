@@ -2,6 +2,8 @@
 
 **Ableton Live Project Health Scanner** — analyze, version, and compare `.als` project files from the command line.
 
+ALScan never modifies your Ableton Live project files. All operations are strictly read-only.
+
 ## Installation
 
 ### Prebuilt binaries (recommended)
@@ -55,8 +57,17 @@ alscan-gui
 # Scan a project for issues
 alscan scan "~/Ableton Projects/My Song/"
 
+# Scan with custom thresholds
+alscan scan "~/Ableton Projects/My Song/" --config .alscanrc
+
 # Generate an HTML health report
 alscan scan "~/Ableton Projects/My Song/" --format html --browser
+
+# Export scan results as CSV
+alscan scan "~/Ableton Projects/My Song/" --format csv --output report.csv
+
+# Search for missing samples
+alscan scan "~/Ableton Projects/My Song/" --search-paths "~/Samples,~/Library"
 
 # Capture a structural snapshot
 alscan snapshot "~/Ableton Projects/My Song/"
@@ -69,6 +80,9 @@ alscan merge-plan base.als ours.als theirs.als --output plan.json
 
 # Render an HTML conflict report
 alscan merge-report base.als ours.als theirs.als --output report.html
+
+# Watch a directory and re-scan on saves
+alscan watch "~/Ableton Projects/"
 ```
 
 ## Desktop GUI (optional)
@@ -99,6 +113,7 @@ _(Screenshots to be added)_
 | Area | What it does |
 |------|-------------|
 | **Health scanning** | 22 checks: missing samples, broken plugins, frozen tracks, CPU-heavy plugins, duplicate samples, empty MIDI clips, overlapping notes, extreme velocity, and more |
+| **Configurable thresholds** | Tune check thresholds via `.alscanrc` TOML config file or `--config` flag |
 | **Versioning** | Capture structural snapshots, diff across versions, view change history |
 | **Conflict analysis** | Three-way structural merge analysis with offline HTML reporting |
 | **Rich terminal output** | Color-coded findings grouped by severity (error / warning / info) |
@@ -107,6 +122,10 @@ _(Screenshots to be added)_
 | **CSV output** | Spreadsheet-ready output with `--format csv` |
 | **Exit codes** | `--exit-code` flag exits with code 1 when errors are found; merge-report uses 0/2/3/1 |
 | **Batch scanning** | Scan all projects under a directory with `--recursive` |
+| **Sample search** | Search for missing samples with confidence-ranked candidates via `--search-paths` |
+| **Plugin version tracking** | Extract VST3/AU version info from projects and detect version changes in diffs |
+| **Device parameter comparison** | Compare builtin-device parameters (Device On, named values) across versions |
+| **Watch mode** | Monitor project directories and auto-rescan on `.als` file changes |
 | **Desktop GUI** | Optional PySide6 GUI with navigation, scan, batch, snapshots, compare, and three-way analysis views |
 | **Cross-platform** | Windows, macOS, Linux |
 
@@ -121,7 +140,8 @@ _(Screenshots to be added)_
 | `log` | View snapshot history for a project | Stable |
 | `merge-plan` | Analyze three versions and output a JSON merge plan | |
 | `merge-report` | Analyze three versions and render an HTML conflict report | |
-| `alscan-gui` | Launch the optional PySide6 desktop GUI | New in 0.4.0 |
+| `watch` | Monitor project directories and re-scan on `.als` file changes | |
+| `alscan-gui` | Launch the optional PySide6 desktop GUI (separate entry point) | |
 
 ## GUI Output Examples
 
@@ -298,9 +318,9 @@ This command does not modify any input file.
 
 | OS | Python install | Standalone binary |
 |----|---------------|-------------------|
-| Windows | Python 3.12+ via WSL | `.exe` on Releases |
-| macOS | Manual testing needed | `.dmg` on Releases |
-| Linux | Python 3.12+; CI-tested (Ubuntu) | Not provided |
+| Windows | Python 3.12+ (native) | `.exe` on Releases |
+| macOS | Python 3.12+ | `.dmg` on Releases |
+| Linux | Python 3.12+ | Not provided |
 
 Ableton Live does not run on Linux, but you can use `alscan` on a Linux server to scan or diff project files stored on a shared drive.
 

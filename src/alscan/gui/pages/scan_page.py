@@ -65,10 +65,6 @@ class ScanPage(QWidget):
         options_layout = QHBoxLayout(options_group)
         self.verbose_check = QCheckBox("Verbose")
         options_layout.addWidget(self.verbose_check)
-        options_layout.addWidget(QLabel("Output format:"))
-        self.format_combo = QComboBox()
-        self.format_combo.addItems(["terminal", "json", "html", "csv"])
-        options_layout.addWidget(self.format_combo)
         options_layout.addStretch()
         layout.addWidget(options_group)
 

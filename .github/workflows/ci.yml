@@ -15,10 +15,18 @@ permissions: read-all
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        python-version: ["3.12", "3.13", "3.14"]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.12", "3.13"]
+        exclude:
+          # Reduce matrix size: only test oldest/newest Python on non-Ubuntu
+          - os: windows-latest
+            python-version: "3.13"
+          - os: macos-latest
+            python-version: "3.13"
+      fail-fast: false
 
     steps:
       - uses: actions/checkout@v7
@@ -34,16 +42,39 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Run CLI tests
-        run: pytest -v --ignore=tests/gui
+        run: pytest -W error -v --ignore=tests/gui
 
       - name: Install GUI dependencies
         run: pip install -e ".[gui]"
 
-      - name: Install Qt system dependencies
+      - name: Install Qt system dependencies (Linux)
+        if: runner.os == 'Linux'
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libegl1 libgl1 libxkbcommon-x11-0
 
       - name: Run GUI tests
-        run: QT_QPA_PLATFORM=offscreen pytest -x --timeout=120 --timeout_method=thread -v tests/gui/ tests/test_services.py
+        continue-on-error: ${{ runner.os != 'Linux' }}
+        run: QT_QPA_PLATFORM=offscreen pytest -W error -x --timeout=120 --timeout_method=thread -v tests/gui/ tests/test_services.py
+
+      - name: Build wheel
+        run: pip install build && python -m build --wheel
+
+      - name: Install and smoke test
+        if: runner.os != 'Windows'
+        run: |
+          pip install dist/*.whl
+          alscan --version
+          alscan --help
+          alscan list-checks
+
+      - name: Install and smoke test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $wheel = Get-ChildItem dist/*.whl | Select-Object -First 1
+          pip install $wheel
+          alscan --version
+          alscan --help
+          alscan list-checks
 
   build:
     needs: test

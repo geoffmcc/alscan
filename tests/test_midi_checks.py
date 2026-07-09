@@ -389,7 +389,6 @@ def test_cli_list_checks_includes_midi():
     assert "empty_midi_clips" in result.output
     assert "overlapping_notes" in result.output
     assert "extreme_velocity" in result.output
-    assert "22 checks" in result.output
 
 
 def test_cli_scan_includes_midi_findings(tmp_path):

@@ -6,7 +6,7 @@ from alscan.models import Project
 
 
 @register("missing_samples", severity="error", description="Audio files referenced but not found on disk")
-def check_missing_samples(project: Project, search_paths: list[str] | None = None) -> list[Finding]:
+def check_missing_samples(project: Project, search_paths: list[str] | None = None, candidate_limit: int = 5) -> list[Finding]:
     findings = []
     for track in project.tracks:
         for clip in track.clips:
@@ -20,7 +20,7 @@ def check_missing_samples(project: Project, search_paths: list[str] | None = Non
                     candidates_raw = search_sample(
                         ref.name, search_paths,
                         file_size=ref.original_file_size,
-                        candidate_limit=5,
+                        candidate_limit=candidate_limit,
                     )
                     candidates = [
                         {"path": c.path, "confidence": c.confidence,

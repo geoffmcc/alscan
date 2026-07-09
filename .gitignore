@@ -48,6 +48,9 @@ Thumbs.db
 # Snapshots
 .alscan/
 
+# Backups
+backups/
+
 # Temp test files
 tests/tmp/
 

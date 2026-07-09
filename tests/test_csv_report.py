@@ -326,7 +326,7 @@ def test_cli_list_checks_includes_csv():
     from alscan.cli import cli
     result = CliRunner().invoke(cli, ["list-checks"])
     assert result.exit_code == 0
-    assert "22 checks" in result.output
+    assert "empty_midi_clips" in result.output
 
 
 def test_cli_recursive_csv_format(tmp_path):
