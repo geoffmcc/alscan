@@ -161,7 +161,8 @@ def save_snapshot(proj: Project, project_dir: Path) -> Path:
     tmp = snap_dir / f".{stem}.tmp.{uuid.uuid4().hex[:8]}"
     tmp.write_text(snap.to_json(), encoding="utf-8")
     try:
-        os.fsync(tmp.open("rb").fileno())
+        with tmp.open("rb") as f:
+            os.fsync(f.fileno())
     except OSError:
         pass
     atomic_publish(tmp, path)

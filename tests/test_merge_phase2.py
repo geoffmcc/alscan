@@ -202,7 +202,11 @@ class TestPhase2TrackChanges:
         assert conflicts(p, "track.insertion_position")
 
     def test_divergent_base_track_reordering_conflict(self):
-        p = plan_for([tr(1, "Kick"), tr(2, "Snare")], [tr(2, "Snare"), tr(1, "Kick")], [tr(1, "Kick"), tr(2, "Snare")])
+        p = plan_for(
+            [tr(1, "Kick"), tr(2, "Snare"), tr(3, "Hat")],
+            [tr(2, "Snare"), tr(1, "Kick"), tr(3, "Hat")],
+            [tr(3, "Hat"), tr(1, "Kick"), tr(2, "Snare")],
+        )
         assert conflicts(p, "track.order")
 
     def test_unambiguous_insertion_position(self):

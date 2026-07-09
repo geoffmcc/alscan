@@ -69,3 +69,92 @@ class TestMainWindow:
         min_size = window.minimumSize()
         assert min_size.width() >= 1000
         assert min_size.height() >= 650
+
+
+class TestAboutDialog:
+    def test_help_menu_exists(self, qtbot, app_settings):
+        window = MainWindow(app_settings)
+        qtbot.addWidget(window)
+        menu_bar = window.menuBar()
+        menus = [a.text() for a in menu_bar.actions()]
+        assert "Help" in menus, f"Help menu not found in {menus}"
+
+    def test_about_action_exists(self, qtbot, app_settings):
+        window = MainWindow(app_settings)
+        qtbot.addWidget(window)
+        menu_bar = window.menuBar()
+        help_menu = None
+        for action in menu_bar.actions():
+            if action.text() == "Help":
+                help_menu = action.menu()
+                break
+        assert help_menu is not None, "Help menu not found"
+        actions = [a.text() for a in help_menu.actions()]
+        assert "About ALScan" in actions, f"About action not found in {actions}"
+
+    def test_about_displays_version(self, monkeypatch, qtbot, app_settings):
+        from alscan import __version__
+        from PySide6.QtWidgets import QMessageBox
+
+        captured_text = []
+
+        def fake_about(parent, title, text):
+            captured_text.append(text)
+
+        monkeypatch.setattr(QMessageBox, "about", fake_about)
+
+        window = MainWindow(app_settings)
+        qtbot.addWidget(window)
+        window._show_about()
+
+        assert len(captured_text) == 1
+        assert __version__ in captured_text[0], (
+            f"Version {__version__} not in about text: {captured_text[0][:200]}"
+        )
+
+    def test_about_does_not_contain_fallback(self, monkeypatch, qtbot, app_settings):
+        from PySide6.QtWidgets import QMessageBox
+
+        captured_text = []
+
+        def fake_about(parent, title, text):
+            captured_text.append(text)
+
+        monkeypatch.setattr(QMessageBox, "about", fake_about)
+
+        window = MainWindow(app_settings)
+        qtbot.addWidget(window)
+        window._show_about()
+
+        assert len(captured_text) == 1
+        assert "0.0.0+unknown" not in captured_text[0], (
+            "About should not show fallback version"
+        )
+
+    def test_about_does_not_contain_hardcoded_version(self, monkeypatch, qtbot, app_settings):
+        from PySide6.QtWidgets import QMessageBox
+
+        captured_text = []
+
+        def fake_about(parent, title, text):
+            captured_text.append(text)
+
+        monkeypatch.setattr(QMessageBox, "about", fake_about)
+
+        window = MainWindow(app_settings)
+        qtbot.addWidget(window)
+        window._show_about()
+
+        assert len(captured_text) == 1
+        # The about text must import __version__ at call time, not hardcode
+        # Verify it doesn't contain any hardcoded version like "0.6.0" etc
+        import re
+        hardcoded = re.findall(r'(?:^|[^+])0\.\d+\.\d+', captured_text[0])
+        # The fuzzy match could catch 0.7.0 which IS the current version.
+        # Instead, verify import __version__ is used at call time by
+        # checking the source of _show_about.
+        import inspect
+        source = inspect.getsource(window._show_about)
+        assert "from alscan import __version__" in source or "alscan.__version__" in source, (
+            "About dialog must import __version__ at runtime, not hardcode"
+        )
