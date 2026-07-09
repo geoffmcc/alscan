@@ -334,9 +334,8 @@ pip install -e ".[dev]"
 # Run tests
 pytest
 
-# Run GUI tests (requires PySide6 and pytest-qt)
+# Run GUI tests (requires PySide6 and pytest-qt, included in [gui] extra)
 pip install -e ".[gui]"
-pip install pytest-qt
 QT_QPA_PLATFORM=offscreen pytest tests/gui/
 
 # Run all tests (CLI + services + GUI)
