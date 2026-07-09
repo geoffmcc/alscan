@@ -471,6 +471,10 @@ def diff(path_a: str, path_b: str | None, snapshot: int | None) -> None:
                 click.echo("        ~ device order changed")
             for vc in dc.version_changes:
                 click.echo(f'        ~ "{vc["device_name"]}" version: {vc["old_version"]} -> {vc["new_version"]}')
+            for pc in dc.param_changes:
+                click.echo(f'        ~ "{pc["device_name"]}" parameters:')
+                for param, vals in pc["changes"].items():
+                    click.echo(f'            {param}: {vals["old"]} -> {vals["new"]}')
 
 
 @cli.command()

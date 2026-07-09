@@ -191,7 +191,8 @@ def _parse_devices(track_el, track):
             track.devices.append(Device(name=dev_name, device_type="plugin", plugin_ref=plugin))
         elif tag in BUILTIN_DEVICE_TAGS:
             dev_name = _gv(dev_el, "PresetRef/Value", "Value", "") or tag
-            track.devices.append(Device(name=dev_name, device_type=tag))
+            params = _extract_device_params(dev_el)
+            track.devices.append(Device(name=dev_name, device_type=tag, params=params))
         else:
             track.devices.append(Device(name=tag, device_type=tag))
 
@@ -219,6 +220,31 @@ def _parse_plugin(dev_el):
             version = _gv(info, "SubType", "Value", "")
             return PluginRef(name=name, plugin_type="au", path=path, manufacturer=mfr, version=version)
     return None
+
+
+def _extract_device_params(dev_el) -> dict[str, object]:
+    params: dict[str, object] = {}
+    for at in dev_el.findall("AutomationTarget"):
+        target = at.find("Target")
+        if target is None:
+            continue
+        name_el = target.find("Name")
+        if name_el is not None and name_el.get("Value") == "Device On":
+            manual = at.find("Manual")
+            if manual is not None:
+                v = manual.get("Value", "true")
+                params["device_on"] = v.lower() == "true"
+        user_name = target.find("UserName")
+        if user_name is not None:
+            param_name = user_name.get("Value", "")
+            manual = at.find("Manual")
+            if manual is not None and param_name:
+                v = manual.get("Value", "")
+                try:
+                    params[param_name] = float(v)
+                except (ValueError, TypeError):
+                    params[param_name] = v
+    return params
 
 
 def _parse_clips(track_el, track):
