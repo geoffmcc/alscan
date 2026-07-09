@@ -151,10 +151,10 @@ class TestComparePage:
         page._start_compare()
         assert page.compare_btn.isEnabled()
 
-    def test_result_tree_hidden_initially(self, qtbot):
+    def test_result_widget_hidden_initially(self, qtbot):
         page = ComparePage()
         qtbot.addWidget(page)
-        assert page.result_tree.isVisible() is False
+        assert page.result_widget.isVisible() is False
 
 
 class TestThreeWayPage:
