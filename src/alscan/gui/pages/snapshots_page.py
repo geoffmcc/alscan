@@ -190,10 +190,10 @@ class SnapshotsPage(QWidget):
     def _open_snaps_folder(self) -> None:
         path = self.hist_path_input.text().strip()
         if path:
-            import subprocess
+            from alscan.gui.platform_utils import open_folder
             snaps_path = Path(path).resolve() / ".alscan" / "snapshots"
             if snaps_path.exists():
-                subprocess.Popen(["explorer", str(snaps_path)])
+                open_folder(snaps_path)
             else:
                 QMessageBox.information(
                     self, "No Snapshots",

@@ -213,8 +213,8 @@ class ScanPage(QWidget):
     def _open_folder(self) -> None:
         path = self.path_input.text().strip()
         if path:
-            import subprocess, os
+            from alscan.gui.platform_utils import open_folder
             folder = Path(path).resolve()
             if folder.is_file():
                 folder = folder.parent
-            subprocess.Popen(["explorer", str(folder)])
+            open_folder(folder)

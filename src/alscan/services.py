@@ -132,8 +132,14 @@ def scan_project(
             result = check.func(project)
             findings.extend(result)
         except Exception as e:
-            if options and options.verbose:
-                pass
+            findings.append(Finding(
+                severity="warning",
+                check_name=check.name,
+                title=f"Check \"{check.name}\" failed to run",
+                message=f"The check did not complete. Technical detail: {e}",
+                location="internal",
+                suggestion="Re-run the scan. If the problem persists, report this issue.",
+            ))
 
     elapsed = (time.time() - start) * 1000
     return ScanResult(project=project, findings=findings, scan_time_ms=round(elapsed, 1))
