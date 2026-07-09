@@ -23,6 +23,7 @@ from alscan.project import find_als_file
 from alscan.report.terminal import print_terminal_report, print_batch_summary
 from alscan.report.html import generate_html_report
 from alscan.report.json import generate_json_report
+from alscan.report.csv import generate_csv_report, generate_csv_batch
 from alscan.models import ScanResult
 from alscan.versioner import (
     build_snapshot,
@@ -86,7 +87,7 @@ def cli() -> None:
 
 @cli.command()
 @click.argument("path", type=str, required=True)
-@click.option("--format", "-f", type=click.Choice(["terminal", "json", "html"]), default="terminal",
+@click.option("--format", "-f", type=click.Choice(["terminal", "json", "html", "csv"]), default="terminal",
               help="Output format (default: terminal)")
 @click.option("--browser", "-o", is_flag=True, default=False, help="Open HTML report in browser")
 @click.option("--output", "-O", type=str, default="", help="Write output to file")
@@ -126,6 +127,14 @@ def scan(path: str, format: str, browser: bool, output: str, recursive: bool,
 
         if format == "terminal" and results:
             print_batch_summary(results)
+        elif format == "csv":
+            batch_results = []
+            for i, proj_dir in enumerate(projects):
+                if i < len(results) and results[i] is not None:
+                    batch_results.append((proj_dir, results[i], None))
+                else:
+                    batch_results.append((proj_dir, None, "Scan failed"))
+            click.echo(generate_csv_batch(batch_results))
     else:
         result = _scan_single(path, format, browser, output, verbose, pretty)
         if result and len(result.errors) > 0:
@@ -193,6 +202,14 @@ def _scan_single(path: str, fmt: str, open_browser: bool, output_path: str,
         if open_browser and dest.exists():
             import webbrowser
             webbrowser.open(dest.as_uri())
+    elif fmt == "csv":
+        csv_text = generate_csv_report(result)
+        if output_path:
+            dest = _safe_report_output(output_path, als_file)
+            _write(dest, csv_text)
+            click.echo(f"CSV report written to: {dest}", err=True)
+        else:
+            click.echo(csv_text)
     else:
         text = print_terminal_report(result, verbose=verbose)
         if output_path:

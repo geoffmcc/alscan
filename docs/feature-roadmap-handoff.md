@@ -5,13 +5,13 @@
 | Field | Value |
 |---|---|
 | Version | 0.7.0 (pyproject.toml) |
-| Branch | milestone-1-midi-checks |
-| Commit | d4c4d71 (v0.7.1, baseline) |
-| Working tree | 3 new files, 4 modified |
-| CLI/service tests | 723 passed, 1 skipped (environment-dependent) |
+| Branch | milestone-2-csv |
+| Commit | cc3dfa5 (v0.7.1 + Milestone 1 merged) |
+| Working tree | 3 new files, 3 modified (Milestone 2 uncommitted) |
+| CLI/service tests | 758 passed, 1 skipped (environment-dependent) |
 | GUI tests | 229 passed |
 | Warnings-as-errors | Clean (`-W error`) |
-| Packaging | Wheel builds successfully, `midi.py` included |
+| Packaging | Wheel builds successfully, includes csv.py |
 | Date updated | 2026-07-09 |
 
 ## 2. Product Principles
@@ -30,7 +30,7 @@
 | Seq | Title | Status |
 |-----|-------|--------|
 | 1 | MIDI Note Content Health Checks | COMPLETED |
-| 2 | CSV Export | NOT STARTED |
+| 2 | CSV Export | COMPLETED |
 | 3 | Result Signal and Classification Cleanup | NOT STARTED |
 | 4 | Configurable Health-Check Thresholds | NOT STARTED |
 | 5 | Plugin Version Tracking | NOT STARTED |
@@ -120,20 +120,65 @@
 
 ## 4. Current Milestone
 
-**Selected:** Milestone 2 — CSV Export
+**Selected:** Milestone 3 — Result Signal and Classification Cleanup
 
-**Why next:** Second-highest value-to-effort ratio. Stdlib `csv` module available. 40-60 line report module. No new dependencies. Enables spreadsheet analysis for batch scans. Complements the MIDI checks (users can now CSV-export scans that include MIDI findings).
+**Why next:** Low effort, high impact on user trust. Removes noise from summaries without information loss. Three targeted changes: omit unchanged locators, reclassify snapshot-hash notice, distinguish metadata from health findings.
 
 **Exact acceptance criteria:**
-- `--format csv` works on single-project scan
-- `--format csv` works on batch/recursive scan
-- CLI command produces valid CSV
-- GUI export supports CSV format
-- Stable schema with correct quoting, Unicode, formula-injection protection
-- Shared service layer used by both CLI and GUI
-- Full suite passes with `-W error`
+- Unchanged locators omitted from merge plan/report locator_changes
+- Real locator changes (added/removed/moved/renamed) remain visible
+- Snapshot-hash notice excluded from warning count
+- Summary counts and cards reflect real health findings
+- CLI, GUI, JSON, and HTML agree
 
 ## 5. Session History
+
+### 2026-07-09 — Milestone 2: CSV Export
+
+**Files changed:**
+- `src/alscan/report/csv.py` (new) — CSV report module with formula-injection protection
+- `src/alscan/cli.py` — added "csv" to format choices, CSV dispatch in _scan_single and recursive
+- `src/alscan/services.py` — updated ScanOptions Literal, render_health_report for CSV
+- `src/alscan/gui/pages/scan_page.py` — added "csv" to format combo, Export CSV button, _export_csv method
+- `tests/test_csv_report.py` (new) — 35 tests
+- `README.md` — added CSV output row, updated GUI export description
+- `docs/feature-roadmap-handoff.md` — this document updated
+
+**Behavior added:**
+- `--format csv` for single and batch/recursive CLI scans
+- `--format csv --output <file>` for file output
+- GUI: Export CSV button on scan page, CSV file filter
+- Formula-injection protection: leading `=`, `+`, `-`, `@` prefixed with `'`
+- Deterministic column order: project, project_path, severity, check_name, title, message, location, suggestion, file_path
+- Batch CSV: all projects in one CSV with project column, scan errors as rows
+- Shared service layer: `render_health_report(result, "csv")`
+
+**Exact commands run:**
+```bash
+python -m pytest -q -W error --tb=short          # 758 passed, 1 skipped
+python -m build --wheel                           # Successful, csv.py included
+```
+
+**Exact test totals:**
+- Pre-existing (post-M1): 723 passed, 1 skipped
+- New: 35 tests (all pass)
+- Total CLI/services: 758 passed, 1 skipped
+- Total GUI: 229 passed (unchanged)
+
+**Manual checks:**
+- `alscan scan clean.als --format csv` → valid CSV with header + 1 row
+- `alscan scan all_checks.als --format csv` → valid CSV with findings
+- `alscan scan fixtures/ --recursive --format csv` → batch CSV
+- `alscan scan clean.als --format csv --output test.csv` → file written
+- `alscan scan --help` shows csv in format choices
+
+**Packaging result:**
+- Wheel builds successfully, `alscan/report/csv.py` present
+- No new dependencies
+
+**Remaining limitations:**
+- No CSV export on batch scan GUI page (only scan page)
+- Batch CSV always goes to stdout, no `--output` with `--recursive`
 
 ### 2026-07-09 — Milestone 1: MIDI Note Content Health Checks
 

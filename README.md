@@ -104,6 +104,7 @@ _(Screenshots to be added)_
 | **Rich terminal output** | Color-coded findings grouped by severity (error / warning / info) |
 | **HTML reports** | Dark-themed static health report with summary cards and track listing |
 | **JSON output** | Machine-readable output with `--format json` |
+| **CSV output** | Spreadsheet-ready output with `--format csv` |
 | **Exit codes** | `--exit-code` flag exits with code 1 when errors are found; merge-report uses 0/2/3/1 |
 | **Batch scanning** | Scan all projects under a directory with `--recursive` |
 | **Desktop GUI** | Optional PySide6 GUI with navigation, scan, batch, snapshots, compare, and three-way analysis views |
@@ -126,7 +127,7 @@ _(Screenshots to be added)_
 
 ### Scan Page
 
-The GUI uses a sortable, filterable findings table with severity colouring, search, and a detail panel. Export results as JSON or HTML with one click.
+The GUI uses a sortable, filterable findings table with severity colouring, search, and a detail panel. Export results as JSON, HTML, or CSV with one click.
 
 ### Compare Page
 

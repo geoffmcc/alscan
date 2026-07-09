@@ -62,7 +62,7 @@ class ReportError(Exception):
 
 @dataclass
 class ScanOptions:
-    format: Literal["terminal", "json", "html"] = "terminal"
+    format: Literal["terminal", "json", "html", "csv"] = "terminal"
     verbose: bool = False
     pretty: bool = True
 
@@ -272,6 +272,9 @@ def render_health_report(result: ScanResult, fmt: str, pretty: bool = True) -> s
         return generate_json_report(result, pretty=pretty)
     elif fmt == "html":
         return generate_html_report(result)
+    elif fmt == "csv":
+        from alscan.report.csv import generate_csv_report
+        return generate_csv_report(result)
     else:
         from alscan.report.terminal import print_terminal_report
         return print_terminal_report(result)
