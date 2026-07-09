@@ -239,6 +239,95 @@ QToolTip {
     border-radius: 4px;
     padding: 4px;
 }
+QLabel#badgeAdded {
+    background-color: rgba(166, 227, 161, 0.15);
+    color: #a6e3a1;
+    border: 1px solid #a6e3a1;
+    border-radius: 10px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: bold;
+}
+QLabel#badgeRemoved {
+    background-color: rgba(243, 139, 168, 0.15);
+    color: #f38ba8;
+    border: 1px solid #f38ba8;
+    border-radius: 10px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: bold;
+}
+QLabel#badgeModified {
+    background-color: rgba(137, 180, 250, 0.15);
+    color: #89b4fa;
+    border: 1px solid #89b4fa;
+    border-radius: 10px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: bold;
+}
+QLabel#badgeMoved {
+    background-color: rgba(250, 179, 135, 0.15);
+    color: #fab387;
+    border: 1px solid #fab387;
+    border-radius: 10px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: bold;
+}
+QLabel#badgeRenamed {
+    background-color: rgba(203, 166, 247, 0.15);
+    color: #cba6f7;
+    border: 1px solid #cba6f7;
+    border-radius: 10px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: bold;
+}
+QPushButton#compareModeBtn {
+    background-color: transparent;
+    color: #a6adc8;
+    border: 1px solid #45475a;
+    border-radius: 0px;
+    padding: 4px 12px;
+    font-size: 12px;
+}
+QPushButton#compareModeBtn:checked {
+    background-color: #45475a;
+    color: #cdd6f4;
+}
+QPushButton#compareModeBtn:first-child {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+}
+QPushButton#compareModeBtn:last-child {
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+QFrame#compareSourceHeader {
+    background-color: #181825;
+    border: 1px solid #313244;
+    border-radius: 6px;
+}
+QWidget#compareToolbar {
+    background-color: transparent;
+}
+QLabel#compareSourceA {
+    color: #a6e3a1;
+    font-size: 13px;
+}
+QLabel#compareSourceB {
+    color: #89b4fa;
+    font-size: 13px;
+}
+QLabel#compareSummary {
+    color: #cdd6f4;
+    font-size: 13px;
+    padding: 8px;
+    background-color: #181825;
+    border: 1px solid #313244;
+    border-radius: 6px;
+}
 """
 
 LIGHT_STYLESHEET = """
@@ -420,6 +509,187 @@ QToolTip {
     color: #4c4f69;
     border: 1px solid #ccd0da;
 }
+QLabel#badgeAdded {
+    background-color: rgba(64, 160, 43, 0.12);
+    color: #40a02b;
+    border: 1px solid #40a02b;
+    border-radius: 10px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: bold;
+}
+QLabel#badgeRemoved {
+    background-color: rgba(210, 15, 57, 0.12);
+    color: #d20f39;
+    border: 1px solid #d20f39;
+    border-radius: 10px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: bold;
+}
+QLabel#badgeModified {
+    background-color: rgba(4, 165, 229, 0.12);
+    color: #04a5e5;
+    border: 1px solid #04a5e5;
+    border-radius: 10px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: bold;
+}
+QLabel#badgeMoved {
+    background-color: rgba(254, 100, 11, 0.12);
+    color: #fe640b;
+    border: 1px solid #fe640b;
+    border-radius: 10px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: bold;
+}
+QLabel#badgeRenamed {
+    background-color: rgba(136, 57, 239, 0.12);
+    color: #8839ef;
+    border: 1px solid #8839ef;
+    border-radius: 10px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: bold;
+}
+QPushButton#compareModeBtn {
+    background-color: transparent;
+    color: #6c6f85;
+    border: 1px solid #ccd0da;
+    border-radius: 0px;
+    padding: 4px 12px;
+    font-size: 12px;
+}
+QPushButton#compareModeBtn:checked {
+    background-color: #ccd0da;
+    color: #4c4f69;
+}
+QPushButton#compareModeBtn:first-child {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+}
+QPushButton#compareModeBtn:last-child {
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+QFrame#compareSourceHeader {
+    background-color: #e6e9ef;
+    border: 1px solid #ccd0da;
+    border-radius: 6px;
+}
+QWidget#compareToolbar {
+    background-color: transparent;
+}
+QLabel#compareSourceA {
+    color: #40a02b;
+    font-size: 13px;
+}
+QLabel#compareSourceB {
+    color: #04a5e5;
+    font-size: 13px;
+}
+QLabel#compareSummary {
+    color: #4c4f69;
+    font-size: 13px;
+    padding: 8px;
+    background-color: #e6e9ef;
+    border: 1px solid #ccd0da;
+    border-radius: 6px;
+}
+"""
+
+
+_COMPARE_MINIMAL_STYLESHEET = """
+QLabel#badgeAdded {
+    background-color: rgba(0, 128, 0, 0.12);
+    color: #208020;
+    border: 1px solid #208020;
+    border-radius: 10px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: bold;
+}
+QLabel#badgeRemoved {
+    background-color: rgba(200, 0, 0, 0.12);
+    color: #c02020;
+    border: 1px solid #c02020;
+    border-radius: 10px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: bold;
+}
+QLabel#badgeModified {
+    background-color: rgba(0, 100, 200, 0.12);
+    color: #2060c0;
+    border: 1px solid #2060c0;
+    border-radius: 10px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: bold;
+}
+QLabel#badgeMoved {
+    background-color: rgba(200, 120, 0, 0.12);
+    color: #c06000;
+    border: 1px solid #c06000;
+    border-radius: 10px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: bold;
+}
+QLabel#badgeRenamed {
+    background-color: rgba(100, 30, 200, 0.12);
+    color: #6020c0;
+    border: 1px solid #6020c0;
+    border-radius: 10px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: bold;
+}
+QPushButton#compareModeBtn {
+    background-color: transparent;
+    color: palette(text);
+    border: 1px solid palette(mid);
+    border-radius: 0px;
+    padding: 4px 12px;
+    font-size: 12px;
+}
+QPushButton#compareModeBtn:checked {
+    background-color: palette(midlight);
+    color: palette(text);
+}
+QPushButton#compareModeBtn:first-child {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+}
+QPushButton#compareModeBtn:last-child {
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+QFrame#compareSourceHeader {
+    background-color: palette(window);
+    border: 1px solid palette(mid);
+    border-radius: 6px;
+}
+QWidget#compareToolbar {
+    background-color: transparent;
+}
+QLabel#compareSourceA {
+    color: #40a02b;
+    font-size: 13px;
+}
+QLabel#compareSourceB {
+    color: #04a5e5;
+    font-size: 13px;
+}
+QLabel#compareSummary {
+    font-size: 13px;
+    padding: 8px;
+    background-color: palette(window);
+    border: 1px solid palette(mid);
+    border-radius: 6px;
+}
 """
 
 
@@ -434,7 +704,7 @@ def apply_theme(app: QApplication, mode: ThemeMode | str) -> None:
     else:
         import sys
         if sys.platform == "win32" or sys.platform == "darwin":
-            app.setStyleSheet("")
+            app.setStyleSheet(_COMPARE_MINIMAL_STYLESHEET)
         else:
             app.setStyleSheet(DARK_STYLESHEET)
 

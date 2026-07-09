@@ -158,19 +158,29 @@ class CompareWorker(QRunnable):
         super().__init__()
         self.input_data = input_data
         self.signals = WorkerSignals()
+        self._cancelled = False
+
+    def cancel(self) -> None:
+        self._cancelled = True
 
     def run(self) -> None:
         self.signals.started.emit()
         try:
+            if self._cancelled:
+                return
             result = compare_sources(
                 self.input_data.path_a,
                 self.input_data.path_b,
             )
+            if self._cancelled:
+                return
             self.signals.finished.emit(result)
         except CompareError as e:
-            self.signals.error.emit(str(e), traceback.format_exc())
+            if not self._cancelled:
+                self.signals.error.emit(str(e), traceback.format_exc())
         except Exception as e:
-            self.signals.error.emit(str(e), traceback.format_exc())
+            if not self._cancelled:
+                self.signals.error.emit(str(e), traceback.format_exc())
 
 
 class ThreeWayWorker(QRunnable):
