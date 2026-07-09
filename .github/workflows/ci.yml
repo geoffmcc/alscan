@@ -43,7 +43,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libegl1 libgl1 libxkbcommon-x11-0
 
       - name: Run GUI tests
-        run: QT_QPA_PLATFORM=offscreen pytest -x --timeout=120 -v tests/gui/ tests/test_services.py
+        run: QT_QPA_PLATFORM=offscreen pytest -x --timeout=120 --timeout_method=thread -v tests/gui/ tests/test_services.py
 
   build:
     needs: test

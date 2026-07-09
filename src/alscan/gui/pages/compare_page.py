@@ -97,7 +97,6 @@ class ComparePage(QWidget):
     def set_sources(self, path_a: str, path_b: str) -> None:
         self.path_a_input.setText(path_a)
         self.path_b_input.setText(path_b)
-        self._start_compare()
 
     def _browse(self, target: QLineEdit) -> None:
         path, _ = QFileDialog.getOpenFileName(
