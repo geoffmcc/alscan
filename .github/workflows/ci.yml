@@ -27,15 +27,15 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          pip install -e .
+          pip install --no-build-isolation -e .
           pip install pytest
 
       - name: Run CLI tests
-        run: pytest -v --ignore=tests/gui
+        run: python -m pytest -v --ignore=tests/gui
 
       - name: Install GUI dependencies
         run: |
-          pip install -e ".[gui]"
+          pip install --no-build-isolation -e ".[gui]"
           pip install pytest-qt
 
       - name: Run GUI tests
