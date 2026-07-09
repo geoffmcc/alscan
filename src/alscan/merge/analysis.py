@@ -370,7 +370,7 @@ def _identity_evidence(
         evidence.append("color_index")
 
     group_id = base_track.get("group_id")
-    if group_id not in (None, "", 0) and group_id == branch_track.get("group_id"):
+    if group_id not in (None, "", 0, -1) and group_id == branch_track.get("group_id"):
         evidence.append("group_id")
         strong.append("group_id")
 
@@ -554,7 +554,14 @@ def _analyze_track_order(plan: MergePlan, inputs: ThreeWayInput, matches: dict[s
     base_order = [t["track_id"] for t in inputs.base_snapshot.tracks]
     ours_branch_order = _base_order_seen(inputs.ours_snapshot.tracks, matches["ours"])
     theirs_branch_order = _base_order_seen(inputs.theirs_snapshot.tracks, matches["theirs"])
-    if ours_branch_order != [bid for bid in base_order if bid in ours_branch_order] or theirs_branch_order != [bid for bid in base_order if bid in theirs_branch_order] or _common_order(ours_branch_order, theirs_branch_order) is False:
+
+    ours_filtered = [bid for bid in base_order if bid in ours_branch_order]
+    theirs_filtered = [bid for bid in base_order if bid in theirs_branch_order]
+
+    ours_changed = ours_branch_order != ours_filtered
+    theirs_changed = theirs_branch_order != theirs_filtered
+
+    if ours_changed and theirs_changed and ours_branch_order != theirs_branch_order:
         plan.conflicts.append(Conflict(
             id="conflict-track-order-base-derived",
             field="track.order",

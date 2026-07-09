@@ -529,7 +529,38 @@ def test_cli_as_script_version():
     assert __version__ in r.stdout
 
 
-# -- Report output / atomic write tests --
+def test_runtime_version_matches_distribution_metadata() -> None:
+    from importlib.metadata import version as dist_version
+
+    import alscan
+    assert alscan.__version__ == dist_version("alscan")
+
+
+def test_version_not_fallback_in_installed_mode() -> None:
+    import alscan
+    assert alscan.__version__ != "0.0.0+unknown", (
+        "alscan.__version__ should not be the fallback when installed"
+    )
+
+
+def test_fallback_on_package_not_found(monkeypatch) -> None:
+    import importlib
+    from importlib.metadata import PackageNotFoundError
+
+    def raise_not_found(_name):
+        raise PackageNotFoundError
+
+    monkeypatch.setattr(importlib.metadata, "version", raise_not_found)
+
+    import alscan
+    import importlib as il
+    il.reload(alscan)
+
+    assert alscan.__version__ == "0.0.0+unknown"
+
+    # Restore
+    monkeypatch.undo()
+    il.reload(alscan)
 
 def test_atomic_write_report_concurrent_writers(tmp_path):
     """Verify atomic no-clobber: exactly one of N concurrent writers succeeds."""

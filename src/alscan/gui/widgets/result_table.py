@@ -78,11 +78,11 @@ class FindingsFilterProxy(QSortFilterProxyModel):
 
     def set_severity_filter(self, severity: str) -> None:
         self._severity_filter = severity
-        self.invalidateFilter()
+        self.invalidate()
 
     def set_search_text(self, text: str) -> None:
         self._search_text = text.lower()
-        self.invalidateFilter()
+        self.invalidate()
 
     def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:
         model: FindingsTableModel = self.sourceModel()

@@ -1,0 +1,80 @@
+{
+  "meta": {
+    "tested_commit": "67fc8df",
+    "branch": "three-way-validation-campaign",
+    "date": "2026-07-09",
+    "python": "3.14.6",
+    "platform": "win32",
+    "implementation": "src/alscan/merge/",
+    "alscan_version": "0.6.0",
+    "production_changes": [
+      "src/alscan/merge/analysis.py:373 — excluded -1 from group identity evidence",
+      "src/alscan/merge/analysis.py:557-568 — replaced ordering conflict check with three-way pattern",
+      "tests/test_merge_phase2.py:204-206 — updated test with true divergent reorder"
+    ]
+  },
+  "baseline": {
+    "command": "python -m pytest --tb=short -q",
+    "passed": 489,
+    "skipped": 1,
+    "failed": 0
+  },
+  "defect_fixes": [
+    {
+      "id": "DEFECT-001",
+      "severity": "high",
+      "file": "src/alscan/merge/analysis.py",
+      "line": 373,
+      "change": "Excluded -1 from group identity evidence condition",
+      "rationale": "group_id=-1 means 'no group' in Ableton. The default was treated as strong identity evidence."
+    }
+  ],
+  "behavioral_improvements": [
+    {
+      "id": "IMPROVE-001",
+      "severity": "medium",
+      "file": "src/alscan/merge/analysis.py",
+      "lines": "557-568",
+      "change": "Replaced flat OR of three ordering conditions with proper three-way pattern: conflict only when both branches changed AND to different orders",
+      "rationale": "Single-branch and convergent reorders should not conflict. The three-way value pattern distinguishes unchanged/one-sided/convergent/conflicting."
+    },
+    {
+      "id": "IMPROVE-002",
+      "severity": "low",
+      "file": "tests/three_way/test_tracks_devices.py",
+      "change": "Updated name-swap test to verify TrackChange objects (renames tracked per-track with auto_resolved=True) rather than expecting conflicts",
+      "rationale": "Name swaps are per-track single-branch changes. Each rename is correctly tracked as a modified TrackChange."
+    }
+  ],
+  "post_fix_results": {
+    "three_way_suite": {
+      "total": 165,
+      "passed": 165,
+      "xfailed": 0,
+      "failed": 0
+    },
+    "full_suite": {
+      "total": 655,
+      "passed": 654,
+      "skipped": 1,
+      "xfailed": 0,
+      "failed": 0
+    }
+  },
+  "observations": [
+    {
+      "id": "OBS-003",
+      "severity": "observation",
+      "field": "model",
+      "title": "Track field changes use TrackChange, not AutoResolved",
+      "description": "Per-track field changes are reported as TrackChange objects rather than AutoResolved objects, unlike scalar fields (tempo, time_signature). This is a model design choice."
+    },
+    {
+      "id": "OBS-004",
+      "severity": "observation",
+      "field": "locator",
+      "title": "Unchanged locators appear in the locator_changes list",
+      "description": "Locators identical across all three sides appear with kind='unchanged', inflating the change list."
+    }
+  ]
+}

@@ -161,14 +161,17 @@ class ComparePage(QWidget):
     def _cancel_compare(self) -> None:
         if self._worker is not None:
             self._worker.cancel()
-            try:
-                self._worker.signals.finished.disconnect(self._on_compare_finished)
-            except (TypeError, RuntimeError):
-                pass
-            try:
-                self._worker.signals.error.disconnect(self._on_compare_error)
-            except (TypeError, RuntimeError):
-                pass
+            import warnings
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=RuntimeWarning)
+                try:
+                    self._worker.signals.finished.disconnect(self._on_compare_finished)
+                except (TypeError, RuntimeError, SystemError):
+                    pass
+                try:
+                    self._worker.signals.error.disconnect(self._on_compare_error)
+                except (TypeError, RuntimeError, SystemError):
+                    pass
             self._worker = None
         self.progress_bar.setVisible(False)
         self.compare_btn.setEnabled(True)

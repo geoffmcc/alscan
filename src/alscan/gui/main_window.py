@@ -5,10 +5,10 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QStackedWidget, QStatusBar, QLabel, QFrame,
+    QStackedWidget, QStatusBar, QLabel, QFrame, QMessageBox,
 )
 from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QAction
 
 from alscan.gui import APP_NAME, APP_VERSION
 from alscan.gui.settings import AppSettings
@@ -152,6 +152,30 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.status_bar)
         self.status_label = QLabel("Ready")
         self.status_bar.addWidget(self.status_label)
+
+        self._setup_menu()
+
+    def _setup_menu(self) -> None:
+        menu_bar = self.menuBar()
+
+        help_menu = menu_bar.addMenu("Help")
+
+        about_action = QAction("About ALScan", self)
+        about_action.triggered.connect(self._show_about)
+        help_menu.addAction(about_action)
+
+    def _show_about(self) -> None:
+        from alscan import __version__
+        QMessageBox.about(
+            self,
+            "About ALScan",
+            "<h3>ALScan</h3>"
+            f"<p>Version {__version__}</p>"
+            "<p>Ableton Live Project Health Scanner<br>"
+            "Scan, version, compare, and analyze .als files.</p>"
+            "<p>Structural analysis only. No .als files are modified.</p>"
+            '<p><a href="https://github.com/geoffmcc/alscan">github.com/geoffmcc/alscan</a></p>'
+        )
 
     def _navigate_to(self, page_id: str) -> None:
         idx = self._pages.get(page_id, 0)

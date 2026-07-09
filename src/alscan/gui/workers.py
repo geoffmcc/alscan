@@ -56,6 +56,7 @@ class ThreeWayTaskInput:
     ours: str
     theirs: str
     allow_unrelated: bool = False
+    allow_plausible: bool = False
 
 
 class WorkerSignals(QObject):
@@ -201,6 +202,7 @@ class ThreeWayWorker(QRunnable):
                 self.input_data.ours,
                 self.input_data.theirs,
                 allow_unrelated=self.input_data.allow_unrelated,
+                allow_plausible=self.input_data.allow_plausible,
             )
             self.signals.finished.emit(plan)
         except MergePlanError as e:

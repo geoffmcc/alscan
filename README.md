@@ -64,10 +64,10 @@ alscan snapshot "~/Ableton Projects/My Song/"
 # Compare two project versions
 alscan diff "My Song.als" "My Song Backups/v2.als"
 
-# Experimental: output a JSON merge plan
+# Output a JSON merge plan
 alscan merge-plan base.als ours.als theirs.als --output plan.json
 
-# Experimental: render an HTML conflict report
+# Render an HTML conflict report
 alscan merge-report base.als ours.als theirs.als --output report.html
 ```
 
@@ -84,7 +84,7 @@ ALScan includes an optional PySide6 desktop GUI. Install with `pip install -e ".
 | **Batch Scan** | Recursively scan all projects under a root folder with per-project status table |
 | **Snapshots** | Create structural snapshots and list existing ones |
 | **Compare** | Two-way structural diff between `.als` files, snapshots, or mixed |
-| **Three-Way Analysis** | Experimental base/ours/theirs structural analysis with conflict tree |
+| **Three-Way Analysis** | Base/ours/theirs structural analysis with conflict tree |
 | **Checks** | Browse all 19 registered health checks with descriptions |
 | **Settings** | Theme (system/light/dark), scan defaults, output preferences, recent items limit |
 
@@ -100,7 +100,7 @@ _(Screenshots to be added)_
 |------|-------------|
 | **Health scanning** | 19 checks: missing samples, broken plugins, frozen tracks, CPU-heavy plugins, duplicate samples, empty groups, warped clips, master chain plugins, and more |
 | **Versioning** | Capture structural snapshots, diff across versions, view change history |
-| **Conflict analysis** | Experimental three-way structural merge analysis with offline HTML reporting |
+| **Conflict analysis** | Three-way structural merge analysis with offline HTML reporting |
 | **Rich terminal output** | Color-coded findings grouped by severity (error / warning / info) |
 | **HTML reports** | Dark-themed static health report with summary cards and track listing |
 | **JSON output** | Machine-readable output with `--format json` |
@@ -118,8 +118,8 @@ _(Screenshots to be added)_
 | `snapshot` | Save a structural metadata snapshot of a project | Stable |
 | `diff` | Compare two `.als` files or snapshots | Stable |
 | `log` | View snapshot history for a project | Stable |
-| `merge-plan` | Analyze three versions and output a JSON merge plan | Experimental |
-| `merge-report` | Analyze three versions and render an HTML conflict report | Experimental |
+| `merge-plan` | Analyze three versions and output a JSON merge plan | |
+| `merge-report` | Analyze three versions and render an HTML conflict report | |
 | `alscan-gui` | Launch the optional PySide6 desktop GUI | New in 0.4.0 |
 
 ## GUI Output Examples
@@ -235,9 +235,9 @@ alscan log "My Song/"
 
 Tempo, time signature, locator, track layout, track names, volume, group assignment, colour, device lists (additions, removals, reordering), device and clip counts. Structural metadata only — not a complete Ableton project comparison.
 
-## Merge Conflict Report (experimental)
+## Merge Conflict Report
 
-> ⚠️ **Experimental.** This command analyzes structural differences but does not apply merges, write `.als` files, produce XML, or reconstruct projects.
+> This command analyzes structural differences but does not apply merges, write `.als` files, produce XML, or reconstruct projects.
 
 ```bash
 alscan merge-report BASE OURS THEIRS --output report.html
@@ -278,9 +278,9 @@ Source file paths are reduced to basenames. Plugin-state data is redacted.
 
 Create merged metadata, modify `.als` files, write XML, apply conflicts, interpret plugin state, or reconstruct Ableton projects.
 
-## Merge Plan (experimental)
+## Merge Plan
 
-> ⚠️ **Experimental.** Same analysis engine as `merge-report`, but outputs a JSON merge plan instead of an HTML report.
+> Same analysis engine as `merge-report`, but outputs a JSON merge plan instead of an HTML report.
 
 ```bash
 alscan merge-plan BASE OURS THEIRS --output plan.json
@@ -354,7 +354,7 @@ python -m build
 - **v0.1** ✅ Project health scanning
 - **v0.2** ✅ Extended checks, JSON output, exit codes
 - **v0.3** ✅ Project versioning (snapshot / diff / log)
-- **v0.4** ✅ Experimental three-way structural analysis, offline conflict reporting
+- **v0.7** ✅ Three-way analysis graduated from Experimental, GUI parity, warning audit, validation campaign
 - **v0.5** 🚧 Optional PySide6 desktop GUI
 
 ## License
