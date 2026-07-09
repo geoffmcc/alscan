@@ -36,7 +36,7 @@ jobs:
         run: pip install -e ".[gui]"
 
       - name: Install Qt system dependencies
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libegl1-mesa libgl1-mesa-glx libxkbcommon-x11-0
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libegl1 libgl1 libxkbcommon-x11-0
 
       - name: Run GUI tests
         run: QT_QPA_PLATFORM=offscreen pytest -v tests/gui/ tests/test_services.py
