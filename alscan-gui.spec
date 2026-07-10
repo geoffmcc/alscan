@@ -10,7 +10,7 @@ hiddenimports += collect_submodules('alscan.merge')
 
 
 a = Analysis(
-    ['src\\alscan\\gui\\app.py'],
+    ['src/alscan/gui/app.py'],
     pathex=[],
     binaries=[],
     datas=[],
