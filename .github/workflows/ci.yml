@@ -110,10 +110,10 @@ jobs:
           pip install pyinstaller .[gui]
 
       - name: Build CLI executable
-        run: pyinstaller alscan.spec --name ${{ matrix.cli_name }}
+        run: pyinstaller alscan.spec
 
       - name: Build GUI executable
-        run: pyinstaller alscan-gui.spec --name ${{ matrix.gui_name }}
+        run: pyinstaller alscan-gui.spec
 
       - name: Create archive (Unix)
         if: runner.os != 'Windows'
