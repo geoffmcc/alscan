@@ -107,9 +107,24 @@ def safe_unlink(path: Path) -> None:
 
 def atomic_publish(temp_path: Path, dest: Path) -> None:
     try:
+        dest_s = str(dest)
+        if dest.is_symlink():
+            raise OSError(
+                f"Refusing to publish to a symlink destination: {dest}"
+            )
+        if hasattr(dest, "is_junction") and dest.is_junction():
+            raise OSError(
+                f"Refusing to publish to a junction destination: {dest}"
+            )
+    except OSError:
+        raise
+    try:
         os.link(str(temp_path), str(dest))
     except FileExistsError:
         raise
+    except OSError:
+        import shutil
+        shutil.copy2(str(temp_path), str(dest))
     finally:
         safe_unlink(temp_path)
 

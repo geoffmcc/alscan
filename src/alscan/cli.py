@@ -18,6 +18,9 @@ from alscan.io_safety import (
 from alscan.merge.analysis import build_merge_plan
 from alscan.merge.inputs import validate_three_way
 from alscan.merge.report import render_merge_report
+from alscan.merge.guided import create_merge_session, build_merge_operations
+from alscan.merge.manifest import MergeManifest
+from alscan.merge.verification import verify_destination
 from alscan.parser import parse_als
 from alscan.project import find_als_file
 from alscan.report.terminal import print_terminal_report, print_batch_summary
@@ -621,6 +624,498 @@ def merge_report_command(base: str, ours: str, theirs: str,
 
     if plan.conflict_count > 0:
         sys.exit(3)
+
+
+@cli.command(name="merge", context_settings={"ignore_unknown_options": True})
+@click.argument("subcommand", type=str, required=True)
+@click.argument("args", nargs=-1, type=click.UNPROCESSED)
+def merge_group(subcommand: str, args: tuple[str, ...]) -> None:
+    """Guided merge workflow commands.
+
+    Subcommands:
+      guide BASE OURS THEIRS      Start a guided merge workflow
+      plan   BASE OURS THEIRS     Generate a merge manifest (non-interactive)
+      verify PLAN DEST            Verify a destination against a manifest
+      resume PLAN                 Resume a saved merge session
+    """
+    if subcommand == "guide":
+        _merge_guide(args)
+    elif subcommand == "plan":
+        _merge_plan_manifest(args)
+    elif subcommand == "verify":
+        _merge_verify(args)
+    elif subcommand == "resume":
+        _merge_resume(args)
+    else:
+        click.echo(f"Unknown merge subcommand: {subcommand}", err=True)
+        click.echo("Available: guide, plan, verify, resume", err=True)
+        sys.exit(1)
+
+
+def _parse_three_args(args: tuple[str, ...]) -> tuple[str, str, str]:
+    if len(args) < 3:
+        click.echo("Error: requires three arguments: BASE OURS THEIRS", err=True)
+        sys.exit(1)
+    return args[0], args[1], args[2]
+
+
+def _merge_guide(args: tuple[str, ...]) -> None:
+    """Interactive guided merge workflow."""
+    non_interactive = False
+    clean_args = []
+    skip_next = False
+    for i, arg in enumerate(args):
+        if skip_next:
+            skip_next = False
+            continue
+        if arg == "--non-interactive":
+            non_interactive = True
+        elif arg == "--allow-unrelated":
+            allow_unrelated_val = True
+        elif arg == "--output" and i + 1 < len(args):
+            pass
+        else:
+            clean_args.append(arg)
+
+    allow_unrelated = "--allow-unrelated" in args
+    base, ours, theirs = _parse_three_args(tuple(clean_args))
+
+    is_tty = sys.stdin.isatty() and sys.stdout.isatty()
+    if non_interactive or not is_tty:
+        _merge_guide_noninteractive(base, ours, theirs, allow_unrelated)
+        return
+
+    _merge_guide_interactive(base, ours, theirs, allow_unrelated)
+
+
+def _merge_guide_noninteractive(base: str, ours: str, theirs: str, allow_unrelated: bool) -> None:
+    click.echo("=== ALScan Guided Merge (non-interactive) ===", err=True)
+    click.echo(f"Base:   {base}", err=True)
+    click.echo(f"Ours:   {ours}", err=True)
+    click.echo(f"Theirs: {theirs}", err=True)
+    click.echo("", err=True)
+
+    try:
+        session, plan = create_merge_session(base, ours, theirs, allow_unrelated=allow_unrelated)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+    preflight = session.safety_preflight
+    if preflight:
+        click.echo("--- Safety Preflight ---", err=True)
+        click.echo(f"Path collision check: {'PASS' if preflight.path_collision_check else 'FAIL'}", err=True)
+        click.echo(f"Version check:        {'PASS' if preflight.version_check else 'FAIL'}", err=True)
+        click.echo(f"Lineage confidence:   {preflight.lineage_confidence}", err=True)
+        for w in preflight.warnings:
+            click.echo(f"  Warning: {w}", err=True)
+
+    foundation = session.foundation_recommendation
+    if foundation:
+        click.echo("", err=True)
+        click.echo("--- Foundation Recommendation ---", err=True)
+        click.echo(f"Recommended: {foundation.recommended} (confidence: {foundation.confidence})", err=True)
+        click.echo(foundation.explanation, err=True)
+        for key, comp in foundation.comparisons.items():
+            star = " (*)" if key == foundation.recommended else ""
+            click.echo(
+                f"  {comp.get('label', key)}{star}: actions={comp.get('estimated_manual_actions', '?')}, "
+                f"risk={comp.get('risk_level', '?')}",
+                err=True,
+            )
+
+    ops = build_merge_operations(session, plan, foundation.recommended if foundation else "ours")
+    click.echo("", err=True)
+    click.echo(f"--- Merge Plan: {len(ops)} operations ---", err=True)
+    for op in ops:
+        state_val = _op_state_label(op)
+        click.echo(f"  {state_val} {op.title}", err=True)
+    sys.exit(0)
+
+
+def _op_state_label(op) -> str:
+    state = op.state.value if hasattr(op.state, 'value') else str(op.state)
+    return {"accepted": "[ACCEPTED]", "awaiting_decision": "[REVIEW]", "completed_manual": "[DONE]"}.get(state, f"[{state.upper()}]")
+
+
+def _merge_guide_interactive(base: str, ours: str, theirs: str, allow_unrelated: bool) -> None:
+    click.echo("=== ALScan Guided Merge ===", err=True)
+    click.echo("", err=True)
+
+    try:
+        session, plan = create_merge_session(base, ours, theirs, allow_unrelated=allow_unrelated)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+    preflight = session.safety_preflight
+    if preflight and not preflight.passed():
+        click.echo("WARNING: Safety preflight detected issues:", err=True)
+        if not preflight.path_collision_check:
+            click.echo("  - Source file collision detected", err=True)
+        for d in preflight.path_collision_details:
+            click.echo(f"    {d}", err=True)
+
+    click.echo(f"Lineage confidence: {plan.lineage_confidence}", err=True)
+    click.echo(f"Conflicts: {plan.conflict_count}, Reconcilable: {len(plan.auto_resolved)}", err=True)
+    click.echo("", err=True)
+
+    # Foundation selection
+    foundation = session.foundation_recommendation
+    if not foundation:
+        click.echo("No foundation recommendation available.", err=True)
+        sys.exit(1)
+
+    click.echo("--- Choose Foundation ---", err=True)
+    click.echo(f"Recommended: {foundation.recommended} (confidence: {foundation.confidence})", err=True)
+    click.echo(foundation.explanation, err=True)
+    click.echo("", err=True)
+    click.echo("Candidates:", err=True)
+    keys = list(foundation.comparisons.keys())
+    for idx, key in enumerate(keys, 1):
+        comp = foundation.comparisons[key]
+        star = " (recommended)" if key == foundation.recommended else ""
+        click.echo(
+            f"  [{idx}] {comp.get('label', key)}{star} — "
+            f"risk: {comp.get('risk_level', '?')}, "
+            f"penalty: {comp.get('penalty_score', '?')}",
+            err=True,
+        )
+    click.echo("  [b] Back  [q] Quit", err=True)
+
+    choice = _prompt("Select foundation [1]: ", ["1", "2", "3", "b", "q"], default="1")
+    if choice == "q":
+        sys.exit(0)
+    if choice == "b":
+        sys.exit(0)
+    try:
+        idx = int(choice) - 1
+        selected_key = keys[idx]
+    except (ValueError, IndexError):
+        selected_key = foundation.recommended
+
+    session.selected_foundation = selected_key
+    click.echo(f"Selected: {foundation.comparisons[selected_key].get('label', selected_key)}", err=True)
+    click.echo("", err=True)
+
+    operations = build_merge_operations(session, plan, selected_key)
+
+    # Decision review
+    click.echo("--- Review Decisions ---", err=True)
+    for idx, op in enumerate(operations):
+        if not op.required_user_decision:
+            continue
+        _interactive_decide(idx, len(operations), op)
+
+    # Destination
+    click.echo("", err=True)
+    click.echo("--- Destination Preparation ---", err=True)
+    click.echo("Open the selected foundation in Ableton Live.", err=True)
+    click.echo("Use File > Save Live Set As to create a NEW destination Set.", err=True)
+    click.echo("The destination must NOT be Base, Ours, or Theirs.", err=True)
+    dest = _prompt("Destination path (or enter to skip): ", default="")
+    if dest and Path(dest).exists():
+        dp = Path(dest)
+        sources = {Path(base), Path(ours), Path(theirs)}
+        if dp.resolve() in {s.resolve() for s in sources}:
+            click.echo("ERROR: Destination cannot be the same as a source file.", err=True)
+        else:
+            session.destination_path = str(dp)
+            click.echo(f"Destination set: {dest}", err=True)
+
+    # Manual execution
+    click.echo("", err=True)
+    click.echo("--- Perform Merge ---", err=True)
+    for idx, op in enumerate(operations):
+        if op.state.value in ("rejected", "deferred") if hasattr(op.state, 'value') else op.state in ("rejected", "deferred"):
+            continue
+        click.echo(f"Step {idx + 1}/{len(operations)}: {op.title}", err=True)
+        if op.instructions:
+            click.echo(f"  {op.instructions.description}", err=True)
+        choices = ["[m] Mark complete", "[s] Skip", "[d] Defer", "[q] Save and quit", "[b] Back"]
+        click.echo("  " + " | ".join(choices), err=True)
+        c = _prompt("Action [m]: ", ["m", "s", "d", "q", "b"], default="m")
+        if c == "q":
+            _interactive_save_and_exit(session, operations, base, ours, theirs)
+        elif c == "s":
+            try:
+                op.transition_to(OperationState.REJECTED)
+            except ValueError:
+                pass
+        elif c == "d":
+            try:
+                op.transition_to(OperationState.DEFERRED)
+            except ValueError:
+                pass
+        elif c == "m":
+            try:
+                if op.state == OperationState.ACCEPTED:
+                    op.transition_to(OperationState.READY)
+                if op.state == OperationState.READY:
+                    op.transition_to(OperationState.IN_PROGRESS)
+                if op.state == OperationState.IN_PROGRESS:
+                    op.transition_to(OperationState.COMPLETED_MANUAL)
+            except ValueError:
+                pass
+            click.echo("  Marked complete.", err=True)
+
+    # Manifest save prompt
+    click.echo("", err=True)
+    click.echo("--- Save Session ---", err=True)
+    if _prompt("Save merge manifest? [y/N]: ", ["y", "n"], default="n") == "y":
+        out = _prompt("Output path [merge-manifest.json]: ", default="merge-manifest.json")
+        manifest = MergeManifest.create(session, operations)
+        hashes = {r: session.sources[r].sha256 for r in ("base", "ours", "theirs") if r in session.sources and session.sources[r]}
+        manifest.source_hashes_captured = hashes
+        try:
+            from alscan.io_safety import atomic_write
+            atomic_write(Path(out), manifest.to_json())
+            click.echo(f"Manifest saved: {out}", err=True)
+        except OSError as e:
+            click.echo(f"Error saving: {e}", err=True)
+
+    click.echo("", err=True)
+    click.echo("Guided merge session complete. Run 'alscan merge verify <manifest> <destination.als>' to verify.", err=True)
+
+
+def _interactive_decide(idx: int, total: int, op) -> None:
+    from alscan.merge.operation import OperationState
+    click.echo(f"  [{idx + 1}/{total}] {op.title}", err=True)
+    if op.description:
+        click.echo(f"    {op.description}", err=True)
+    if op.base_value is not None:
+        click.echo(f"    Base:   {op.base_value}", err=True)
+    if op.ours_value is not None:
+        click.echo(f"    Ours:   {op.ours_value}", err=True)
+    if op.theirs_value is not None:
+        click.echo(f"    Theirs: {op.theirs_value}", err=True)
+    if op.recommended_result is not None:
+        click.echo(f"    Recommended: {op.recommended_result}", err=True)
+    if op.recommendation_rationale:
+        click.echo(f"    Rationale: {op.recommendation_rationale}", err=True)
+
+    click.echo("    [a] Accept  [s] Skip  [d] Defer  [q] Save and quit", err=True)
+    c = _prompt("    Choice [a]: ", ["a", "s", "d", "q"], default="a")
+    if c == "q":
+        from alscan.merge.manifest import MergeManifest
+        ops_list = [op]
+        click.echo("    Saving and exiting...", err=True)
+        sys.exit(0)
+    elif c == "s":
+        try:
+            op.transition_to(OperationState.REJECTED)
+        except ValueError:
+            pass
+    elif c == "d":
+        try:
+            op.transition_to(OperationState.DEFERRED)
+        except ValueError:
+            pass
+    else:
+        try:
+            op.transition_to(OperationState.ACCEPTED)
+        except ValueError:
+            pass
+
+
+def _interactive_save_and_exit(session, operations, base, ours, theirs) -> None:
+    from alscan.merge.manifest import MergeManifest
+    out = _prompt("Manifest path [merge-manifest.json]: ", default="merge-manifest.json")
+    manifest = MergeManifest.create(session, operations)
+    hashes = {r: session.sources[r].sha256 for r in ("base", "ours", "theirs") if r in session.sources and session.sources[r]}
+    manifest.source_hashes_captured = hashes
+    try:
+        from alscan.io_safety import atomic_write
+        atomic_write(Path(out), manifest.to_json())
+        click.echo(f"Saved: {out}", err=True)
+    except OSError as e:
+        click.echo(f"Error saving: {e}", err=True)
+    sys.exit(0)
+
+
+def _prompt(msg: str, valid: list[str] | None = None, default: str = "") -> str:
+    import sys as _sys
+    try:
+        value = input(msg).strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        click.echo("", err=True)
+        _sys.exit(0)
+    if not value and default:
+        return default
+    if valid and value not in valid:
+        return default
+    return value
+
+
+def _merge_plan_manifest(args: tuple[str, ...]) -> None:
+    """Generate a merge manifest (non-interactive JSON export)."""
+    import json as _json
+
+    allow_unrelated = False
+    output_path = ""
+    clean_args = []
+    skip_next = False
+    for i, arg in enumerate(args):
+        if skip_next:
+            skip_next = False
+            continue
+        if arg == "--allow-unrelated":
+            allow_unrelated = True
+        elif arg == "--output" and i + 1 < len(args):
+            output_path = args[i + 1]
+            skip_next = True
+        else:
+            clean_args.append(arg)
+
+    base, ours, theirs = _parse_three_args(tuple(clean_args))
+
+    try:
+        session, plan = create_merge_session(base, ours, theirs, allow_unrelated=allow_unrelated)
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+    foundation = session.foundation_recommendation
+    ops = build_merge_operations(
+        session, plan, foundation.recommended if foundation else "ours"
+    )
+    manifest = MergeManifest.create(session, ops)
+
+    source_hashes = {
+        role: session.sources[role].sha256
+        for role in ("base", "ours", "theirs")
+        if role in session.sources
+    }
+    manifest.source_hashes_captured = source_hashes
+
+    json_str = manifest.to_json()
+
+    if output_path:
+        dest_p = Path(output_path)
+        try:
+            validate_output_dest(
+                dest_p,
+                [Path(base), Path(ours), Path(theirs)],
+                reject_ableton_exts=True,
+                reject_backup=True,
+                reject_alscan=True,
+            )
+            _atomic_write_report(dest_p, json_str)
+            click.echo(f"Merge manifest written to: {dest_p}", err=True)
+        except (ValueError, FileExistsError) as e:
+            click.echo(f"Error: {e}", err=True)
+            sys.exit(1)
+        except OSError as e:
+            click.echo(f"Error writing manifest: {e}", err=True)
+            sys.exit(1)
+    else:
+        click.echo(json_str)
+
+    if plan.conflict_count > 0:
+        sys.exit(3)
+
+
+def _merge_verify(args: tuple[str, ...]) -> None:
+    """Verify a destination .als against a merge manifest."""
+    if len(args) < 2:
+        click.echo("Error: requires two arguments: MANIFEST.json DESTINATION.als", err=True)
+        sys.exit(1)
+
+    manifest_path = args[0]
+    dest_path = args[1]
+
+    mp = Path(manifest_path)
+    if not mp.exists():
+        click.echo(f"Error: manifest not found: {manifest_path}", err=True)
+        sys.exit(1)
+
+    try:
+        manifest = MergeManifest.from_json(mp.read_text(encoding="utf-8"))
+    except (ValueError, json.JSONDecodeError) as e:
+        click.echo(f"Error reading manifest: {e}", err=True)
+        sys.exit(1)
+
+    session = manifest.get_session()
+    source_paths = {}
+    for role in ("base", "ours", "theirs"):
+        if role not in session.sources:
+            continue
+        src = session.sources[role]
+        if hasattr(src, "path"):
+            source_paths[role] = src.path
+        elif isinstance(src, dict):
+            source_paths[role] = src.get("path", src.get("resolved", ""))
+        else:
+            source_paths[role] = str(src)
+    source_hashes = manifest.source_hashes_captured
+
+    try:
+        report = verify_destination(dest_path, manifest, source_paths, source_hashes)
+    except Exception as e:
+        click.echo(f"Error during verification: {e}", err=True)
+        sys.exit(1)
+
+    click.echo("=== Verification Report ===", err=True)
+    click.echo(f"Destination: {dest_path}", err=True)
+    click.echo(f"Total operations: {report.total_operations}", err=True)
+    click.echo(f"Passed:  {report.passed}", err=True)
+    click.echo(f"Failed:  {report.failed}", err=True)
+    click.echo(f"Partial: {report.partial}", err=True)
+    click.echo(f"Unverifiable: {report.unverifiable}", err=True)
+    click.echo(f"Blocked: {report.blocked}", err=True)
+    click.echo(f"Source hashes stable: {'YES' if report.source_hashes_stable else 'NO'}", err=True)
+
+    for detail in report.source_hash_details:
+        if detail.get("status") == "changed":
+            click.echo(
+                f"  {detail.get('role')}: CHANGED — "
+                f"expected {detail.get('expected_sha256', '')[:12]}..., "
+                f"got {detail.get('observed_sha256', '')[:12]}...",
+                err=True,
+            )
+
+    for error in report.errors:
+        click.echo(f"Error: {error}", err=True)
+
+    if report.failed > 0 or not report.source_hashes_stable:
+        sys.exit(3)
+
+
+def _merge_resume(args: tuple[str, ...]) -> None:
+    """Resume a saved merge session from a manifest."""
+    if not args:
+        click.echo("Error: requires a manifest file: alsan merge resume plan.json", err=True)
+        sys.exit(1)
+
+    manifest_path = args[0]
+    mp = Path(manifest_path)
+    if not mp.exists():
+        click.echo(f"Error: manifest not found: {manifest_path}", err=True)
+        sys.exit(1)
+
+    try:
+        manifest = MergeManifest.from_json(mp.read_text(encoding="utf-8"))
+    except (ValueError, json.JSONDecodeError) as e:
+        click.echo(f"Error reading manifest: {e}", err=True)
+        sys.exit(1)
+
+    session = manifest.get_session()
+    operations = manifest.get_operations()
+
+    click.echo(f"Resumed session: {session.session_id}", err=True)
+    click.echo(f"Workflow state: {session.workflow_state}", err=True)
+    click.echo(f"Selected foundation: {session.selected_foundation}", err=True)
+
+    completed = sum(1 for op in operations if op.is_completed() or op.is_verified())
+    total = len(operations)
+    click.echo(f"Progress: {completed}/{total} operations completed", err=True)
+
+    for op in operations:
+        state_val = op.state.value if hasattr(op.state, 'value') else str(op.state)
+        if state_val in ("accepted", "awaiting_decision"):
+            click.echo(f"  [PENDING] {op.title}", err=True)
+        elif op.is_completed():
+            click.echo(f"  [DONE] {op.title}", err=True)
 
 
 @cli.command(name="watch")

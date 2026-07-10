@@ -1,8 +1,21 @@
 # SPDX-License-Identifier: GPL-3.0-only
+"""Merge plan data model (v2).
+
+The AutoResolved dataclass records changes that ALScan can automatically
+reconcile from the three-way analysis. It does NOT indicate that a change
+was automatically *applied* — ALScan is read-only and never modifies source
+.als files. In user-facing output, prefer terms such as "Automatically
+reconcilable," "Suggested resolution," or "No direct conflict detected."
+
+The AutoResolved class is retained for serialization backward compatibility
+with existing v2 merge plan JSON output.
+"""
+
 from __future__ import annotations
 
 import json
 import time
+import warnings
 from dataclasses import dataclass, field, asdict
 from typing import Literal
 
@@ -11,6 +24,18 @@ from alscan import __version__
 
 @dataclass
 class AutoResolved:
+    """A change that ALScan can automatically reconcile from three-way analysis.
+
+    **Deprecation note**: The name "AutoResolved" is misleading — ALScan does
+    not modify .als files. The preferred term for user-facing output is
+    "Automatically reconcilable" or "Suggested resolution." This class is
+    retained for backward compatibility with existing v2 plan JSON.
+
+    When generating new user-facing output, map these fields:
+    - "Auto-resolved changes" → "Automatically reconcilable changes"
+    - "Auto resolved" → "Suggested resolution"
+    - "Auto-resolved count" → "Automatically reconcilable count"
+    """
     id: str
     field: str
     base_value: object = None
@@ -37,8 +62,8 @@ class IdentityMatch:
     track_id: int = 0
     name: str = ""
     base_track_id: int = 0
-    ours_track_id: int | None = 0
-    theirs_track_id: int | None = 0
+    ours_track_id: int | None = None
+    theirs_track_id: int | None = None
     confidence: str = "exact"
     classification: str = "exact"
     evidence: list[str] = field(default_factory=list)

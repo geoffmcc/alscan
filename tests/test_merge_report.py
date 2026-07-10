@@ -146,7 +146,7 @@ def test_render_merge_report_is_deterministic_and_sorts_all_sections():
 def test_render_merge_report_sections_and_safety_wording_are_accurate():
     html = render_merge_report(_representative_plan("Safe"))
     for text in [
-        "Conflicts requiring review", "Auto-resolved changes", "Track changes", "Locator changes",
+        "Conflicts requiring review", "Automatically reconcilable changes", "Track changes", "Locator changes",
         "Identity matches", "Proposed track order (analysis-only)", "Supported field scope",
         "exact - Exact", "plausible - Plausible", "ambiguous - Ambiguous", "unmatched - Unmatched",
         "delete-vs-modify", "track.insertion_position", "locator.movement", "locator.identity",
@@ -154,7 +154,7 @@ def test_render_merge_report_sections_and_safety_wording_are_accurate():
     ]:
         assert text in html
     assert "write .als files" in html
-    assert "apply conflict resolutions" in html
+    assert "apply changes" in html
     for unsafe_claim in ("merged .als exists", "conflicts were applied", "full Ableton-project equivalence"):
         assert unsafe_claim not in html
 

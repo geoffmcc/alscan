@@ -113,7 +113,7 @@ class TestHtmlReportConsistency:
         assert "Summary" in html
         assert "Sources" in html
         assert "Conflicts" in html
-        assert "Auto-resolved" in html
+        assert "Reconcilable" in html
         assert "Privacy warning" in html
 
     def test_conflict_vs_auto_resolved_consistent(self):
