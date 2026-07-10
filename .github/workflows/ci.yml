@@ -110,10 +110,10 @@ jobs:
           pip install pyinstaller .[gui]
 
       - name: Build CLI executable
-        run: pyinstaller --onefile --name ${{ matrix.cli_name }} --collect-submodules alscan.checks --collect-submodules alscan.report src/alscan/cli.py
+        run: pyinstaller alscan.spec --name ${{ matrix.cli_name }}
 
       - name: Build GUI executable
-        run: pyinstaller --onefile --name ${{ matrix.gui_name }} --collect-submodules alscan.checks --collect-submodules alscan.report --collect-submodules alscan.gui --collect-submodules alscan.services src/alscan/gui/app.py
+        run: pyinstaller alscan-gui.spec --name ${{ matrix.gui_name }}
 
       - name: Create archive (Unix)
         if: runner.os != 'Windows'
