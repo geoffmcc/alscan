@@ -238,11 +238,11 @@ class GuidedMergePage(QWidget):
         theirs = self._get_theirs_input().text().strip()
 
         if not base or not ours or not theirs:
-            QMessageBox.warning(self, "Input Error", "All three file paths are required.")
+            self._set_status("Error: All three file paths are required.")
             return
         for label, p in [("Base", base), ("Ours", ours), ("Theirs", theirs)]:
             if not Path(p).exists():
-                QMessageBox.warning(self, "Input Error", f"{label} file not found:\n{p}")
+                self._set_status(f"Error: {label} file not found — {p}")
                 return
 
         self._navigate_stage(1)
