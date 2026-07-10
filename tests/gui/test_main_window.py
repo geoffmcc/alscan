@@ -22,7 +22,7 @@ class TestMainWindow:
         qtbot.addWidget(window)
         assert window.windowTitle() == f"{APP_NAME} v{APP_VERSION}"
         assert window.stack is not None
-        assert window.stack.count() == 8
+        assert window.stack.count() == 9
 
     def test_navigation(self, qtbot, app_settings):
         window = MainWindow(app_settings)
@@ -30,7 +30,7 @@ class TestMainWindow:
         window._navigate_to("scan")
         assert window.stack.currentIndex() == 1
         window._navigate_to("settings")
-        assert window.stack.currentIndex() == 7
+        assert window.stack.currentIndex() == 8
         window._navigate_to("home")
         assert window.stack.currentIndex() == 0
 

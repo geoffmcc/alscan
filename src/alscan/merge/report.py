@@ -50,7 +50,7 @@ def render_merge_report(plan: MergePlan | dict[str, Any]) -> str:
         _warnings(warnings),
         _notices(notices),
         _section("Conflicts requiring review", conflicts, _conflict_card, empty="No conflicts detected."),
-        _section("Auto-resolved changes", auto_resolved, _auto_card, empty="No auto-resolved changes."),
+        _section("Automatically reconcilable changes", auto_resolved, _auto_card, empty="No automatically reconcilable changes."),
         _section("Track changes", track_changes, _track_card, empty="No track changes."),
         _section("Locator changes", locator_changes, _locator_card, empty="No locator changes."),
         _section("Identity matches", identity_matches, _identity_card, empty="No identity matches."),
@@ -184,7 +184,8 @@ def _privacy_footer() -> str:
         "source labels, hashes, plugin/device names, and sample names may reveal unreleased "
         "work, collaborators, clients, or local workflow details. Review before sharing.</p>"
         "<p>This report is read-only. It does not modify source files, create merged metadata, "
-        "write .als files, or apply conflict resolutions.</p>"
+        "write .als files, or apply changes. Changes labeled 'automatically reconcilable' are "
+        "analysis recommendations only — they have not been applied to any Ableton project.</p>"
         "</footer>"
     )
 
@@ -193,7 +194,7 @@ def _summary(data: dict[str, Any]) -> str:
     cards = [
         ("Conflicts", data.get("conflict_count", 0)),
         ("Warnings", data.get("warning_count", 0)),
-        ("Auto-resolved", len(data.get("auto_resolved", []))),
+        ("Reconcilable", len(data.get("auto_resolved", []))),
         ("Track changes", len(data.get("track_changes", []))),
         ("Locator changes", len(data.get("locator_changes", []))),
         ("Lineage", data.get("lineage_confidence", "")),
@@ -283,7 +284,7 @@ def _auto_card(item: dict[str, Any]) -> str:
             ("Resolution", item.get("resolution", "")),
             ("Description", item.get("description", "")),
         ],
-        {"base": item.get("base_value"), "resolved": item.get("resolved_value")},
+        {"base": item.get("base_value"), "reconciled": item.get("resolved_value")},
     )
 
 
@@ -296,7 +297,7 @@ def _track_card(item: dict[str, Any]) -> str:
             ("Track ID", item.get("track_id", "")),
             ("Base track ID", item.get("base_track_id", "")),
             ("Branch track ID", item.get("branch_track_id", "")),
-            ("Auto resolved", item.get("auto_resolved", "")),
+            ("Auto reconciled", item.get("auto_resolved", "")),
         ],
         {"proposed_position": item.get("proposed_position"), "details": item.get("details", {})},
     )
@@ -308,7 +309,7 @@ def _locator_card(item: dict[str, Any]) -> str:
         title,
         [
             ("Branch", item.get("branch", "")),
-            ("Auto resolved", item.get("auto_resolved", "")),
+            ("Auto reconciled", item.get("auto_resolved", "")),
         ],
         {
             "base_time": item.get("base_time"),
@@ -330,7 +331,7 @@ def _identity_card(item: dict[str, Any]) -> str:
             ("Base track ID", item.get("base_track_id", "")),
             ("Ours track ID", item.get("ours_track_id", "")),
             ("Theirs track ID", item.get("theirs_track_id", "")),
-            ("Auto resolved", item.get("auto_resolved", "")),
+            ("Auto reconciled", item.get("auto_resolved", "")),
             ("Evidence", item.get("evidence", [])),
             ("Warnings", item.get("warnings", [])),
         ],

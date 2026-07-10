@@ -152,7 +152,9 @@ def _parse_tracks(live_set, proj):
         except ValueError:
             track_id = -1
         name = _gv(child, "Name/EffectiveName", "Value", "")
-        color_str = _gv(child, "ColorIndex", "Value", "0")
+        color_str = _gv(child, "Color", "Value", None)
+        if color_str is None:
+            color_str = _gv(child, "ColorIndex", "Value", "0")
         try:
             color_index = int(color_str)
         except ValueError:

@@ -4,7 +4,47 @@ All notable changes to ALScan will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.8.0] — 2026-07-09 (unreleased)
+## [0.9.0] — 2026-07-10 (unreleased)
+
+### Added
+- **Guided Merge** — manual read-only merge workflow for combining divergent Ableton Live Set versions
+  - Interactive CLI wizard with foundation selection, decision review, and manual execution tracking
+  - 9-stage GUI wizard with session save/open/resume, destination validation, and verification
+  - Merge session persistence via versioned `MergeManifest` JSON format
+  - Foundation recommendation engine with penalty-based candidate scoring
+  - Ordered merge plan generation from three-way analysis results
+  - Destination verification engine (tempo, time sig, tracks, locators)
+  - Source immutability enforcement with hash capture and recheck
+  - Changed-source detection blocking stale session resumption
+  - CLI/GUI manifest interoperability
+- Pluggable automation executor architecture with `ALS_WRITING_ENABLED` safety flag
+- Repository `.als` policy enforcement script (`scripts/check_als_policy.py`)
+- Synthetic fixture ID allocator and pointee allocator for parser testing
+
+### Changed
+- Three-way analysis terminology: "auto-resolved" → "automatically reconcilable" in user-facing text
+- Session state transitions now guarded with valid transition map
+- `is_verified()` now returns `True` only for `VERIFICATION_PASSED`; `has_verification_result()` added for broader checks
+- `atomic_publish` hardened against symlinks and cross-device links
+- `version_is_supported` now checks both major and minor version
+
+### Fixed
+- `IdentityMatch.ours_track_id` / `.theirs_track_id` defaults changed from `0` (valid track ID) to `None`
+- Manifest `from_json` properly warns on incompatible session data instead of silently swallowing TypeError
+- `_deserialize_operation` raises clear error for unknown enum values instead of crashing with opaque TypeError
+- `_redact_session` deep-copies source dicts to prevent mutation of live session data
+- Safety preflight operations correctly report `unverifiable` instead of `pass`
+- Locator move verification compares values before claiming pass
+- Empty track names return `unverifiable` instead of passing removal checks
+- `_check_source_stability` reports `no_captured_hash` when captured hash is missing
+- Parser handles `<Color Value="N"/>` (Live 12) with fallback to `<ColorIndex Value="N"/>`
+
+### Security
+- Automatic `.als` writing is disabled: `ALS_WRITING_ENABLED = False` with registration-time enforcement
+- Executor registry rejects non-manual executors while writing is disabled
+- No CLI flag, GUI control, manifest field, or environment variable can bypass the safety flag
+
+## [0.8.0] — 2026-07-09
 
 ### Added
 - MIDI note content health checks: `empty_midi_clips`, `overlapping_notes`, `extreme_velocity`

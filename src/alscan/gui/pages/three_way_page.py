@@ -315,7 +315,7 @@ class ThreeWayPage(QWidget):
         lineage = QTreeWidgetItem(["Lineage Confidence", plan.lineage_confidence])
         root.addChild(lineage)
         root.addChild(QTreeWidgetItem(["Conflicts", str(plan.conflict_count)]))
-        root.addChild(QTreeWidgetItem(["Auto-Resolved", str(len(plan.auto_resolved))]))
+        root.addChild(QTreeWidgetItem(["Reconcilable", str(len(plan.auto_resolved))]))
         root.addChild(QTreeWidgetItem(["Warnings", str(plan.warning_count)]))
 
         if plan.sources:
@@ -344,7 +344,7 @@ class ThreeWayPage(QWidget):
                 child.addChild(QTreeWidgetItem(["Theirs", str(c.theirs_value)]))
 
         if plan.auto_resolved:
-            auto_item = QTreeWidgetItem(["Auto-Resolved", str(len(plan.auto_resolved))])
+            auto_item = QTreeWidgetItem(["Reconcilable", str(len(plan.auto_resolved))])
             root.addChild(auto_item)
             for a in plan.auto_resolved:
                 child = QTreeWidgetItem([f"{a.field}: {a.id}", a.resolution])
@@ -398,7 +398,7 @@ class ThreeWayPage(QWidget):
         self.result_tree.expandAll()
         self.status_label.setText(
             f"Analysis complete: {plan.conflict_count} conflict(s), "
-            f"{len(plan.auto_resolved)} auto-resolved change(s)"
+            f"{len(plan.auto_resolved)} reconcilable change(s)"
         )
 
     def _save_json(self) -> None:

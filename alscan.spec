@@ -4,6 +4,7 @@ from PyInstaller.utils.hooks import collect_submodules
 hiddenimports = []
 hiddenimports += collect_submodules('alscan.checks')
 hiddenimports += collect_submodules('alscan.report')
+hiddenimports += collect_submodules('alscan.merge')
 
 
 a = Analysis(

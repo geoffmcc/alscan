@@ -55,3 +55,13 @@ tests/tmp/
 
 # External package manager lock files
 uv.lock
+
+# Agent handoff files
+AGENTS.md
+
+# Local validation directories — real Ableton-authored .als files
+# used for manual acceptance testing. Must never be committed to GitHub.
+local-validation/
+validation/live-authored/
+validation/output/
+acceptance-test-output/

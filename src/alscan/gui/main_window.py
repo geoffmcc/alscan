@@ -19,6 +19,7 @@ from alscan.gui.pages.checks_page import ChecksPage
 from alscan.gui.pages.snapshots_page import SnapshotsPage
 from alscan.gui.pages.compare_page import ComparePage
 from alscan.gui.pages.three_way_page import ThreeWayPage
+from alscan.gui.pages.guided_merge_page import GuidedMergePage
 from alscan.gui.pages.settings_page import SettingsPage
 
 
@@ -71,6 +72,7 @@ class MainWindow(QMainWindow):
             ("Snapshots", "snapshots"),
             ("Compare", "compare"),
             ("Three-Way Analysis", "threeway"),
+            ("Guided Merge", "guidedmerge"),
             ("Checks", "checks"),
             ("Settings", "settings"),
         ]
@@ -107,6 +109,7 @@ class MainWindow(QMainWindow):
         self.snapshots_page = SnapshotsPage(self._settings)
         self.compare_page = ComparePage()
         self.three_way_page = ThreeWayPage()
+        self.guided_merge_page = GuidedMergePage()
         self.checks_page = ChecksPage()
         self.settings_page = SettingsPage(self._settings)
 
@@ -116,6 +119,7 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.snapshots_page)
         self.stack.addWidget(self.compare_page)
         self.stack.addWidget(self.three_way_page)
+        self.stack.addWidget(self.guided_merge_page)
         self.stack.addWidget(self.checks_page)
         self.stack.addWidget(self.settings_page)
 
@@ -126,8 +130,9 @@ class MainWindow(QMainWindow):
             "snapshots": 3,
             "compare": 4,
             "threeway": 5,
-            "checks": 6,
-            "settings": 7,
+            "guidedmerge": 6,
+            "checks": 7,
+            "settings": 8,
         }
 
         self.home_page.scan_path.connect(
