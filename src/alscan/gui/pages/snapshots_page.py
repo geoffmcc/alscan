@@ -138,6 +138,7 @@ class SnapshotsPage(QWidget):
         self.snap_btn.setEnabled(True)
         if isinstance(dest, Path):
             self.status_label.setText(f"Snapshot saved: {dest}")
+            self._refresh_history()
             QMessageBox.information(
                 self, "Snapshot Created",
                 f"Structural snapshot saved to:\n{dest}"

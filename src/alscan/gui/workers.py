@@ -129,12 +129,18 @@ class SnapshotWorker(QRunnable):
     def run(self) -> None:
         self.signals.started.emit()
         try:
+            if self._cancelled:
+                return
             dest = create_snapshot(self.input_data.path)
+            if self._cancelled:
+                return
             self.signals.finished.emit(dest)
         except SnapshotError as e:
-            self.signals.error.emit(str(e), traceback.format_exc())
+            if not self._cancelled:
+                self.signals.error.emit(str(e), traceback.format_exc())
         except Exception as e:
-            self.signals.error.emit(str(e), traceback.format_exc())
+            if not self._cancelled:
+                self.signals.error.emit(str(e), traceback.format_exc())
 
 
 class ListSnapshotsWorker(QRunnable):
@@ -197,6 +203,8 @@ class ThreeWayWorker(QRunnable):
     def run(self) -> None:
         self.signals.started.emit()
         try:
+            if self._cancelled:
+                return
             plan = create_merge_plan(
                 self.input_data.base,
                 self.input_data.ours,
@@ -204,8 +212,12 @@ class ThreeWayWorker(QRunnable):
                 allow_unrelated=self.input_data.allow_unrelated,
                 allow_plausible=self.input_data.allow_plausible,
             )
+            if self._cancelled:
+                return
             self.signals.finished.emit(plan)
         except MergePlanError as e:
-            self.signals.error.emit(str(e), traceback.format_exc())
+            if not self._cancelled:
+                self.signals.error.emit(str(e), traceback.format_exc())
         except Exception as e:
-            self.signals.error.emit(str(e), traceback.format_exc())
+            if not self._cancelled:
+                self.signals.error.emit(str(e), traceback.format_exc())

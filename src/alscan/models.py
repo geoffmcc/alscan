@@ -9,6 +9,7 @@ from typing import Literal
 TrackType = Literal["audio", "midi", "group", "return", "master"]
 PluginType = Literal["vst2", "vst3", "au", "builtin"]
 Severity = Literal["error", "warning", "info", "suggestion"]
+_VALID_SEVERITIES = frozenset({"error", "warning", "info", "suggestion"})
 
 
 @dataclass
@@ -112,6 +113,13 @@ class Finding:
     suggestion: str = ""
     file_path: str = ""
     candidates: list[dict] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if self.severity not in _VALID_SEVERITIES:
+            raise ValueError(
+                f"Invalid severity {self.severity!r}; "
+                f"expected one of {sorted(_VALID_SEVERITIES)}"
+            )
 
     def dict(self) -> dict:
         result = {
