@@ -23,18 +23,47 @@ class SearchCandidate:
 
 
 def known_sample_dirs() -> list[Path]:
-    dirs: list[Path] = []
     if sys.platform == "win32":
-        docs = os.environ.get("USERPROFILE", "")
-        if docs:
-            docs_path = Path(docs) / "Documents"
-            dirs.append(docs_path / "Ableton" / "User Library" / "Samples")
-            dirs.append(docs_path / "Ableton" / "Factory Packs")
+        return _windows_sample_dirs()
     elif sys.platform == "darwin":
-        home = Path.home()
-        dirs.append(home / "Music" / "Ableton" / "User Library" / "Samples")
-        dirs.append(home / "Music" / "Ableton" / "Factory Packs")
+        return _macos_sample_dirs()
+    return _linux_sample_dirs()
+
+
+def _windows_sample_dirs() -> list[Path]:
+    dirs: list[Path] = []
+    docs = os.environ.get("USERPROFILE", "")
+    if docs:
+        docs_path = Path(docs) / "Documents"
+        dirs.append(docs_path / "Ableton" / "User Library" / "Samples")
+        dirs.append(docs_path / "Ableton" / "Factory Packs")
     return [d for d in dirs if d.is_dir()]
+
+
+def _macos_sample_dirs() -> list[Path]:
+    home = Path.home()
+    return [d for d in [
+        home / "Music" / "Ableton" / "User Library" / "Samples",
+        home / "Music" / "Ableton" / "Factory Packs",
+    ] if d.is_dir()]
+
+
+def _linux_sample_dirs() -> list[Path]:
+    home = Path.home()
+    return [d for d in [
+        home / ".ableton" / "User Library" / "Samples",
+        home / ".ableton" / "Factory Packs",
+    ] if d.is_dir()]
+
+
+_CASE_INSENSITIVE_FS = sys.platform in ("darwin", "win32")
+
+
+def _seen_key(match: Path) -> str:
+    resolved = str(match.resolve())
+    if _CASE_INSENSITIVE_FS:
+        return resolved.casefold()
+    return resolved
 
 
 def search_sample(
@@ -64,7 +93,7 @@ def search_sample(
                 for match in base.rglob(pattern):
                     if cancelled_cb and cancelled_cb():
                         return _rank_candidates(candidates)[:candidate_limit]
-                    mp = str(match.resolve())
+                    mp = _seen_key(match)
                     if mp in seen:
                         continue
                     seen.add(mp)
@@ -82,7 +111,7 @@ def search_sample(
                     continue
                 if not _name_matches(match.name, name):
                     continue
-                mp = str(match.resolve())
+                mp = _seen_key(match)
                 if mp in seen:
                     continue
                 seen.add(mp)
