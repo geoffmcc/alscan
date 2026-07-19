@@ -226,9 +226,12 @@ class TestVerificationSafety:
         )
         operations = build_merge_operations(session, plan, "base")
         manifest = MergeManifest.create(session, operations)
-        json1 = manifest.to_json()
-        manifest2 = MergeManifest.from_json(json1)
-        json2 = manifest2.to_json()
+        frozen = "2026-01-01T00:00:00Z"
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr("alscan.merge.manifest._utc_now", lambda: frozen)
+            json1 = manifest.to_json()
+            manifest2 = MergeManifest.from_json(json1)
+            json2 = manifest2.to_json()
         assert json1 == json2
 
 
