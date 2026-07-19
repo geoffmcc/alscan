@@ -45,6 +45,7 @@ def _plan_for(base, ours, theirs):
         ours_identity=SimpleNamespace(sha256="o" * 40, size=100, path=Path("ours.json")),
         theirs_identity=SimpleNamespace(sha256="t" * 40, size=100, path=Path("theirs.json")),
         lineage=lineage,
+        allow_plausible=False,
     )
     return build_merge_plan(inputs)
 

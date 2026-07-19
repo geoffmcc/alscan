@@ -653,10 +653,10 @@ def merge_group(subcommand: str, args: tuple[str, ...]) -> None:
     """Guided merge workflow commands.
 
     Subcommands:
-      guide BASE OURS THEIRS      Start a guided merge workflow
-      plan   BASE OURS THEIRS     Generate a merge manifest (non-interactive)
-      verify PLAN DEST            Verify a destination against a manifest
-      resume PLAN                 Resume a saved merge session
+      guide BASE OURS THEIRS [--output PATH] [--allow-plausible] [--allow-unrelated]
+      plan   BASE OURS THEIRS [--output PATH] [--allow-plausible] [--allow-unrelated]
+      verify PLAN DEST
+      resume PLAN
     """
     if subcommand == "guide":
         _merge_guide(args)
@@ -676,12 +676,18 @@ def _parse_three_args(args: tuple[str, ...]) -> tuple[str, str, str]:
     if len(args) < 3:
         click.echo("Error: requires three arguments: BASE OURS THEIRS", err=True)
         sys.exit(1)
+    if len(args) > 3:
+        click.echo(f"Error: expected exactly three positional arguments, got {len(args)}", err=True)
+        sys.exit(1)
     return args[0], args[1], args[2]
 
 
 def _merge_guide(args: tuple[str, ...]) -> None:
     """Interactive guided merge workflow."""
     non_interactive = False
+    allow_unrelated = False
+    allow_plausible = False
+    output_path = ""
     clean_args = []
     skip_next = False
     for i, arg in enumerate(args):
@@ -691,24 +697,29 @@ def _merge_guide(args: tuple[str, ...]) -> None:
         if arg == "--non-interactive":
             non_interactive = True
         elif arg == "--allow-unrelated":
-            allow_unrelated_val = True
+            allow_unrelated = True
+        elif arg == "--allow-plausible":
+            allow_plausible = True
         elif arg == "--output" and i + 1 < len(args):
-            pass
+            output_path = args[i + 1]
+            skip_next = True
+        elif arg.startswith("-") and arg != "-":
+            click.echo(f"Error: unknown option: {arg}", err=True)
+            sys.exit(1)
         else:
             clean_args.append(arg)
 
-    allow_unrelated = "--allow-unrelated" in args
     base, ours, theirs = _parse_three_args(tuple(clean_args))
 
     is_tty = sys.stdin.isatty() and sys.stdout.isatty()
     if non_interactive or not is_tty:
-        _merge_guide_noninteractive(base, ours, theirs, allow_unrelated)
+        _merge_guide_noninteractive(base, ours, theirs, allow_unrelated, allow_plausible)
         return
 
-    _merge_guide_interactive(base, ours, theirs, allow_unrelated)
+    _merge_guide_interactive(base, ours, theirs, allow_unrelated, allow_plausible)
 
 
-def _merge_guide_noninteractive(base: str, ours: str, theirs: str, allow_unrelated: bool) -> None:
+def _merge_guide_noninteractive(base: str, ours: str, theirs: str, allow_unrelated: bool, allow_plausible: bool) -> None:
     click.echo("=== ALScan Guided Merge (non-interactive) ===", err=True)
     click.echo(f"Base:   {base}", err=True)
     click.echo(f"Ours:   {ours}", err=True)
@@ -716,7 +727,7 @@ def _merge_guide_noninteractive(base: str, ours: str, theirs: str, allow_unrelat
     click.echo("", err=True)
 
     try:
-        session, plan = create_merge_session(base, ours, theirs, allow_unrelated=allow_unrelated)
+        session, plan = create_merge_session(base, ours, theirs, allow_unrelated=allow_unrelated, allow_plausible=allow_plausible)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
@@ -758,12 +769,12 @@ def _op_state_label(op) -> str:
     return {"accepted": "[ACCEPTED]", "awaiting_decision": "[REVIEW]", "completed_manual": "[DONE]"}.get(state, f"[{state.upper()}]")
 
 
-def _merge_guide_interactive(base: str, ours: str, theirs: str, allow_unrelated: bool) -> None:
+def _merge_guide_interactive(base: str, ours: str, theirs: str, allow_unrelated: bool, allow_plausible: bool) -> None:
     click.echo("=== ALScan Guided Merge ===", err=True)
     click.echo("", err=True)
 
     try:
-        session, plan = create_merge_session(base, ours, theirs, allow_unrelated=allow_unrelated)
+        session, plan = create_merge_session(base, ours, theirs, allow_unrelated=allow_unrelated, allow_plausible=allow_plausible)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
@@ -972,6 +983,7 @@ def _merge_plan_manifest(args: tuple[str, ...]) -> None:
     import json as _json
 
     allow_unrelated = False
+    allow_plausible = False
     output_path = ""
     clean_args = []
     skip_next = False
@@ -981,16 +993,21 @@ def _merge_plan_manifest(args: tuple[str, ...]) -> None:
             continue
         if arg == "--allow-unrelated":
             allow_unrelated = True
+        elif arg == "--allow-plausible":
+            allow_plausible = True
         elif arg == "--output" and i + 1 < len(args):
             output_path = args[i + 1]
             skip_next = True
+        elif arg.startswith("-") and arg != "-":
+            click.echo(f"Error: unknown option: {arg}", err=True)
+            sys.exit(1)
         else:
             clean_args.append(arg)
 
     base, ours, theirs = _parse_three_args(tuple(clean_args))
 
     try:
-        session, plan = create_merge_session(base, ours, theirs, allow_unrelated=allow_unrelated)
+        session, plan = create_merge_session(base, ours, theirs, allow_unrelated=allow_unrelated, allow_plausible=allow_plausible)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
