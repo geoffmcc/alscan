@@ -316,6 +316,11 @@ def save_report(
     dest: Path,
     source_paths: list[Path] | None = None,
 ) -> Path:
+    """Save a report to dest with safety validation.
+
+    validate_output_dest() includes validate_parent() which checks for
+    symlink/junction traversal in path components.
+    """
     sources = source_paths or []
     try:
         validate_output_dest(dest, sources)
