@@ -81,6 +81,7 @@ class ThreeWayInput:
     ours_identity: SourceIdentity
     theirs_identity: SourceIdentity
     lineage: LineageResult
+    allow_plausible: bool = False
 
 
 def _parse_input(path: Path, mode: InputMode) -> Snapshot:
@@ -125,7 +126,7 @@ def validate_three_way(
         )
 
     if mode == "snapshot":
-        for p, label in [(base_p, "base"), (ours_p, "theirs"), (theirs_p, "theirs")]:
+        for p, label in [(base_p, "base"), (ours_p, "ours"), (theirs_p, "theirs")]:
             try:
                 raw = p.read_text(encoding="utf-8")
                 normalize_snapshot_json(raw)
@@ -182,6 +183,7 @@ def validate_three_way(
         ours_identity=ours_id,
         theirs_identity=theirs_id,
         lineage=lineage,
+        allow_plausible=allow_plausible,
     )
 
 

@@ -169,12 +169,8 @@ def _analyze_tracks(plan: MergePlan, inputs: ThreeWayInput) -> dict[str, dict[in
         "theirs": _duplicate_track_ids(theirs_tracks),
     }
     matches = {
-        "ours": _match_branch(base_tracks, ours_tracks, duplicate_ids["base"], duplicate_ids["ours"], exact_only=False),
-        "theirs": _match_branch(base_tracks, theirs_tracks, duplicate_ids["base"], duplicate_ids["theirs"], exact_only=False),
-    }
-    exact_matches = {
-        "ours": _match_branch(base_tracks, ours_tracks, duplicate_ids["base"], duplicate_ids["ours"], exact_only=True),
-        "theirs": _match_branch(base_tracks, theirs_tracks, duplicate_ids["base"], duplicate_ids["theirs"], exact_only=True),
+        "ours": _match_branch(base_tracks, ours_tracks, duplicate_ids["base"], duplicate_ids["ours"], exact_only=not inputs.allow_plausible),
+        "theirs": _match_branch(base_tracks, theirs_tracks, duplicate_ids["base"], duplicate_ids["theirs"], exact_only=not inputs.allow_plausible),
     }
     duplicate_base = {
         "ours": _ambiguous_branch_duplicates(base_tracks, ours_tracks, duplicate_ids["base"], duplicate_ids["ours"]),
@@ -263,7 +259,7 @@ def _analyze_tracks(plan: MergePlan, inputs: ThreeWayInput) -> dict[str, dict[in
         _analyze_matched_track_fields(plan, bt, ot, tt, identity_classification)
 
     _analyze_additions(plan, base_tracks, ours_tracks, theirs_tracks, reverse)
-    return exact_matches
+    return matches
 
 
 def _duplicate_track_ids(tracks: list[dict]) -> set[int]:

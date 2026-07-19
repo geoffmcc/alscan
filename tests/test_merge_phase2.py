@@ -51,7 +51,7 @@ def snap(tracks=None, locators=None, name="song") -> Snapshot:
     )
 
 
-def inputs(base: Snapshot, ours: Snapshot, theirs: Snapshot):
+def inputs(base: Snapshot, ours: Snapshot, theirs: Snapshot, allow_plausible: bool = False):
     def ident(label):
         return SimpleNamespace(sha256=f"sha-{label}", size=100, path=Path(f"{label}.json"))
     return SimpleNamespace(
@@ -63,14 +63,16 @@ def inputs(base: Snapshot, ours: Snapshot, theirs: Snapshot):
         ours_identity=ident("ours"),
         theirs_identity=ident("theirs"),
         lineage=LineageResult(level="strong", fingerprint_match=True, track_overlap_pct=1.0, project_name_match=True),
+        allow_plausible=allow_plausible,
     )
 
 
-def plan_for(base_tracks, ours_tracks, theirs_tracks, base_locs=None, ours_locs=None, theirs_locs=None):
+def plan_for(base_tracks, ours_tracks, theirs_tracks, base_locs=None, ours_locs=None, theirs_locs=None, allow_plausible=False):
     return build_merge_plan(inputs(
         snap(base_tracks, base_locs),
         snap(ours_tracks, ours_locs),
         snap(theirs_tracks, theirs_locs),
+        allow_plausible=allow_plausible,
     ))
 
 
@@ -93,7 +95,7 @@ class TestPhase2TrackIdentity:
         assert conflicts(p, "track.identity")
 
     def test_different_id_three_fields_plausible(self):
-        p = plan_for([tr(1, "Kick")], [tr(10, "Kick")], [tr(20, "Kick")])
+        p = plan_for([tr(1, "Kick")], [tr(10, "Kick")], [tr(20, "Kick")], allow_plausible=True)
         match = identities(p, "plausible")[0]
         assert {"name", "track_type", "devices"}.issubset(set(match.evidence))
         assert match.auto_resolved is False
@@ -111,13 +113,13 @@ class TestPhase2TrackIdentity:
         assert conflicts(p, "track.identity")
 
     def test_one_exact_and_one_plausible_branch_match(self):
-        p = plan_for([tr(1, "Kick")], [tr(1, "Kick")], [tr(20, "Kick")])
+        p = plan_for([tr(1, "Kick")], [tr(1, "Kick")], [tr(20, "Kick")], allow_plausible=True)
         match = identities(p, "plausible")[0]
         assert match.ours_track_id == 1
         assert match.theirs_track_id == 20
 
     def test_both_branches_plausible_with_different_branch_ids(self):
-        p = plan_for([tr(1, "Kick")], [tr(10, "Kick")], [tr(20, "Kick")])
+        p = plan_for([tr(1, "Kick")], [tr(10, "Kick")], [tr(20, "Kick")], allow_plausible=True)
         match = identities(p, "plausible")[0]
         assert (match.ours_track_id, match.theirs_track_id) == (10, 20)
 
@@ -154,7 +156,7 @@ class TestPhase2TrackIdentity:
         base = tr(1, "Distinct", clip_count=3, volume=0.9)
         ours = tr(10, "Distinct", clip_count=3, volume=0.9)
         theirs = tr(20, "Distinct", clip_count=3, volume=0.9)
-        p = plan_for([base], [ours], [theirs])
+        p = plan_for([base], [ours], [theirs], allow_plausible=True)
         match = identities(p, "plausible")[0]
         assert "name" in match.evidence
         assert match.auto_resolved is False
@@ -243,7 +245,7 @@ class TestPhase2TrackChanges:
         base = [tr(1, "Kick"), tr(4, "Bass")]
         ours = [tr(10, "Kick"), tr(2, "Hat"), tr(4, "Bass")]
         theirs = [tr(20, "Kick"), tr(4, "Bass")]
-        p = plan_for(base, ours, theirs)
+        p = plan_for(base, ours, theirs, allow_plausible=True)
         added = [c for c in p.track_changes if c.name == "Hat"][0]
         assert added.proposed_position == {"after_base_track_id": None, "before_base_track_id": 4}
 
@@ -402,7 +404,7 @@ class TestPhase2SafetyCompatibility:
             theirs_track = tr(20, "Distinct", clip_count=3, volume=0.9)
             base_track[field] = base_value
             ours_track[field] = changed_value
-            p = plan_for([base_track], [ours_track], [theirs_track])
+            p = plan_for([base_track], [ours_track], [theirs_track], allow_plausible=True)
             changes = [c for c in p.track_changes if c.details.get("field") == field]
             if changes:
                 assert all(c.auto_resolved is False for c in changes)
