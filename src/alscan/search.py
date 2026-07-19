@@ -23,18 +23,37 @@ class SearchCandidate:
 
 
 def known_sample_dirs() -> list[Path]:
-    dirs: list[Path] = []
     if sys.platform == "win32":
-        docs = os.environ.get("USERPROFILE", "")
-        if docs:
-            docs_path = Path(docs) / "Documents"
-            dirs.append(docs_path / "Ableton" / "User Library" / "Samples")
-            dirs.append(docs_path / "Ableton" / "Factory Packs")
+        return _windows_sample_dirs()
     elif sys.platform == "darwin":
-        home = Path.home()
-        dirs.append(home / "Music" / "Ableton" / "User Library" / "Samples")
-        dirs.append(home / "Music" / "Ableton" / "Factory Packs")
+        return _macos_sample_dirs()
+    return _linux_sample_dirs()
+
+
+def _windows_sample_dirs() -> list[Path]:
+    dirs: list[Path] = []
+    docs = os.environ.get("USERPROFILE", "")
+    if docs:
+        docs_path = Path(docs) / "Documents"
+        dirs.append(docs_path / "Ableton" / "User Library" / "Samples")
+        dirs.append(docs_path / "Ableton" / "Factory Packs")
     return [d for d in dirs if d.is_dir()]
+
+
+def _macos_sample_dirs() -> list[Path]:
+    home = Path.home()
+    return [d for d in [
+        home / "Music" / "Ableton" / "User Library" / "Samples",
+        home / "Music" / "Ableton" / "Factory Packs",
+    ] if d.is_dir()]
+
+
+def _linux_sample_dirs() -> list[Path]:
+    home = Path.home()
+    return [d for d in [
+        home / ".ableton" / "User Library" / "Samples",
+        home / ".ableton" / "Factory Packs",
+    ] if d.is_dir()]
 
 
 def search_sample(

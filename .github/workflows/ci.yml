@@ -18,8 +18,17 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.12", "3.13", "3.14"]
+        exclude:
+          - os: macos-latest
+            python-version: "3.13"
+          - os: macos-latest
+            python-version: "3.14"
+          - os: windows-latest
+            python-version: "3.13"
+          - os: windows-latest
+            python-version: "3.14"
       fail-fast: false
 
     steps:
@@ -81,11 +90,11 @@ jobs:
             cli_name: alscan
             gui_name: alscan-gui
           - os: macos-15
-            asset_name: alscan-x86_64-macos.tar.gz
+            asset_name: alscan-aarch64-macos.tar.gz
             cli_name: alscan
             gui_name: alscan-gui
-          - os: macos-14
-            asset_name: alscan-aarch64-macos.tar.gz
+          - os: macos-15-intel
+            asset_name: alscan-x86_64-macos.tar.gz
             cli_name: alscan
             gui_name: alscan-gui
           - os: windows-latest
