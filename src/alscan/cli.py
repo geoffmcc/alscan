@@ -97,17 +97,27 @@ def cli() -> None:
 @click.option("--recursive", "-r", is_flag=True, default=False, help="Scan all projects in a directory")
 @click.option("--verbose", "-v", is_flag=True, default=False, help="Show detailed output")
 @click.option("--exit-code", "-e", is_flag=True, default=False, help="Exit with code 1 if any errors found")
-@click.option("--pretty", "-p", is_flag=True, default=True, help="Pretty-print JSON output")
+@click.option("--fail-on-warning", is_flag=True, default=False, help="Exit with code 1 if any warnings found (implies --exit-code)")
+@click.option("--pretty", "-p", is_flag=True, default=False, help="Pretty-print JSON output")
+@click.option("--no-pretty", is_flag=True, default=False, help="Disable pretty-print JSON output")
 @click.option("--config", "-c", type=str, default="", help="Path to .alscanrc config file")
 @click.option("--search-paths", "-s", type=str, default="", help="Additional sample search paths (comma-separated)")
 @click.option("--no-default-paths", is_flag=True, default=False, help="Do not search default Ableton library paths")
 @click.option("--candidate-limit", type=int, default=5, help="Max candidates per missing sample (default: 5)")
 def scan(path: str, format: str, browser: bool, output: str, recursive: bool,
-         verbose: bool, exit_code: bool, pretty: bool, config: str,
+         verbose: bool, exit_code: bool, fail_on_warning: bool, pretty: bool, no_pretty: bool, config: str,
          search_paths: str, no_default_paths: bool, candidate_limit: int) -> None:
     """Scan an Ableton Live project for health issues."""
     scan_path = Path(path).resolve()
     any_errors = False
+    any_warnings = False
+
+    # --fail-on-warning implies --exit-code
+    if fail_on_warning:
+        exit_code = True
+
+    # Resolve pretty flag (--no-pretty takes precedence)
+    use_pretty = pretty and not no_pretty
 
     if candidate_limit < 0:
         click.echo("Error: --candidate-limit must be >= 0", err=True)
@@ -133,9 +143,11 @@ def scan(path: str, format: str, browser: bool, output: str, recursive: bool,
             name = proj_dir.name
             click.echo(f"[{i}/{total}] {name}...", err=True)
             try:
-                r = _scan_single(str(proj_dir), format, browser, output, verbose, pretty, check_config, _sp, candidate_limit)
+                r = _scan_single(str(proj_dir), format, browser, output, verbose, use_pretty, check_config, _sp, candidate_limit)
                 if r and len(r.errors) > 0:
                     any_errors = True
+                if r and len(r.warnings) > 0:
+                    any_warnings = True
                 results.append(r)
             except Exception as e:
                 click.echo(f"  Failed: {e}", err=True)
@@ -151,15 +163,22 @@ def scan(path: str, format: str, browser: bool, output: str, recursive: bool,
                     batch_results.append((proj_dir, None, "Scan failed"))
             click.echo(generate_csv_batch(batch_results))
     else:
-        result = _scan_single(path, format, browser, output, verbose, pretty, check_config, _sp, candidate_limit)
+        result = _scan_single(path, format, browser, output, verbose, use_pretty, check_config, _sp, candidate_limit)
         if result and len(result.errors) > 0:
             any_errors = True
+        if result and len(result.warnings) > 0:
+            any_warnings = True
 
-    if exit_code and any_errors:
+    if exit_code and (any_errors or (fail_on_warning and any_warnings)):
         sys.exit(1)
 
 
 def _load_check_config(config_path: str, project_path: Path) -> CheckConfig | None:
+    """Load check configuration with explicit config taking precedence over discovery.
+
+    If config_path is provided and exists, use it. Otherwise, discover
+    config from the project directory. Returns None if no config found.
+    """
     if config_path:
         p = Path(config_path).resolve()
         if not p.is_file():
