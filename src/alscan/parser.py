@@ -35,6 +35,11 @@ def parse_als(path: str | Path) -> Project:
     path = Path(path).resolve()
     if not path.exists():
         raise FileNotFoundError(str(path))
+    file_size = path.stat().st_size
+    if file_size == 0:
+        raise ValueError(f"ALS file is empty: {path}")
+    if file_size < 50:
+        raise ValueError(f"ALS file is too small to be valid ({file_size} bytes): {path}")
     raw = path.read_bytes()
     if raw[:2] == b"\x1f\x8b":
         buf = io.BytesIO(raw)
