@@ -56,6 +56,16 @@ def _linux_sample_dirs() -> list[Path]:
     ] if d.is_dir()]
 
 
+_CASE_INSENSITIVE_FS = sys.platform in ("darwin", "win32")
+
+
+def _seen_key(match: Path) -> str:
+    resolved = str(match.resolve())
+    if _CASE_INSENSITIVE_FS:
+        return resolved.casefold()
+    return resolved
+
+
 def search_sample(
     name: str,
     search_paths: list[str | Path],
@@ -83,7 +93,7 @@ def search_sample(
                 for match in base.rglob(pattern):
                     if cancelled_cb and cancelled_cb():
                         return _rank_candidates(candidates)[:candidate_limit]
-                    mp = str(match.resolve())
+                    mp = _seen_key(match)
                     if mp in seen:
                         continue
                     seen.add(mp)
@@ -101,7 +111,7 @@ def search_sample(
                     continue
                 if not _name_matches(match.name, name):
                     continue
-                mp = str(match.resolve())
+                mp = _seen_key(match)
                 if mp in seen:
                     continue
                 seen.add(mp)
