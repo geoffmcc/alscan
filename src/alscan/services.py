@@ -43,14 +43,20 @@ CancelledCb = Callable[[], bool]
 
 
 def _invoke_check(check: Check, project, config: CheckConfig | None, search_paths: list[str] | None = None, candidate_limit: int = 5):
+    """Invoke a check function with appropriate keyword arguments.
+
+    Inspects the check function's signature and only passes parameters
+    it actually accepts. Falls back to a plain call if inspection fails.
+    """
     try:
         sig = inspect.signature(check.func)
+        params = sig.parameters
         kwargs: dict[str, object] = {}
-        if "config" in sig.parameters:
+        if "config" in params:
             kwargs["config"] = config
-        if "search_paths" in sig.parameters:
+        if "search_paths" in params:
             kwargs["search_paths"] = search_paths or []
-        if "candidate_limit" in sig.parameters:
+        if "candidate_limit" in params:
             kwargs["candidate_limit"] = candidate_limit
         if kwargs:
             return check.func(project, **kwargs)

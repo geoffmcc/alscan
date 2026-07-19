@@ -190,38 +190,39 @@ def _build_search_paths(search_paths_str: str, no_default_paths: bool) -> list[s
     return paths if paths else None
 
 
-from alscan.services import _invoke_check as _invoke_check_cli
-
-
 def _scan_single(path: str, fmt: str, open_browser: bool, output_path: str,
                  verbose: bool, pretty: bool = True,
                  check_config: CheckConfig | None = None,
                  search_paths: list[str] | None = None,
                  candidate_limit: int = 5) -> ScanResult | None:
+    """Scan a single project and handle output formatting.
+
+    Uses services.scan_project() for the actual scanning, then handles
+    output formatting and file writing in the CLI layer.
+    """
+    from alscan.services import scan_project, ScanOptions, ScanError
+
     als_file = _resolve_als_path(path)
     if als_file is None:
         return None
 
-    start = time.time()
+    options = ScanOptions(
+        format=fmt,
+        verbose=verbose,
+        pretty=pretty,
+        check_config=check_config,
+        search_paths=search_paths,
+        candidate_limit=candidate_limit,
+    )
 
     try:
-        project = parse_als(als_file)
-    except Exception as e:
-        click.echo(f"Error parsing {als_file}: {e}", err=True)
+        result = scan_project(als_file, options)
+    except ScanError as e:
+        click.echo(f"Error: {e}", err=True)
         return None
-
-    from alscan.checks import list_checks
-    findings = []
-    for check in list_checks():
-        try:
-            result = _invoke_check_cli(check, project, check_config, search_paths, candidate_limit)
-            findings.extend(result)
-        except Exception as e:
-            if verbose:
-                click.echo(f"  Check '{check.name}' failed: {e}", err=True)
-
-    elapsed = (time.time() - start) * 1000
-    result = ScanResult(project=project, findings=findings, scan_time_ms=round(elapsed, 1))
+    except Exception as e:
+        click.echo(f"Error scanning {als_file}: {e}", err=True)
+        return None
 
     def _write(dest: Path, content: str) -> None:
         try:

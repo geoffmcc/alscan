@@ -332,8 +332,9 @@ class TestInvokeCheckConsolidation:
         _invoke_check(check, proj, None, None, candidate_limit=20)
         assert captured["candidate_limit"] == 20
 
-    def test_cli_invoke_check_alias_works(self):
-        from alscan.cli import _invoke_check_cli
+    def test_services_invoke_check_consolidated(self):
+        """Verify _invoke_check is now only in services.py (Phase 1 consolidation)."""
+        from alscan.services import _invoke_check
         from alscan.checks import Check
         captured = {}
 
@@ -343,5 +344,5 @@ class TestInvokeCheckConsolidation:
 
         check = Check(name="test", func=sample_check, severity="info")
         proj = Project(path=Path("."), creator="t")
-        _invoke_check_cli(check, proj, None, None, candidate_limit=15)
+        _invoke_check(check, proj, None, None, candidate_limit=15)
         assert captured["candidate_limit"] == 15
